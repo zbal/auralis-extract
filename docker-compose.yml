@@ -1,0 +1,57 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      JOBS_DIR: /data/jobs
+      OUTPUT_DIR: /data/output
+      TEMP_DIR: /tmp/auralis-extract
+      METADATA_CACHE_DIR: /data/cache/metadata
+      THUMBNAIL_CACHE_DIR: /data/cache/thumbnails
+      FFMPEG_THREADS: "0"
+      NORMALIZATION_MODE: one_pass
+      TARGET_LUFS: "-14"
+      DOWNLOAD_CONCURRENT_FRAGMENTS: "4"
+      MAX_JOB_RETRIES: "2"
+      JOB_TIMEOUT_SECONDS: "7200"
+    volumes:
+      - ./data/jobs:/data/jobs
+      - ./data/output:/data/output
+      - ./data/cache:/data/cache
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker.worker"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      JOBS_DIR: /data/jobs
+      OUTPUT_DIR: /data/output
+      TEMP_DIR: /tmp/auralis-extract
+      METADATA_CACHE_DIR: /data/cache/metadata
+      THUMBNAIL_CACHE_DIR: /data/cache/thumbnails
+      FFMPEG_THREADS: "0"
+      NORMALIZATION_MODE: one_pass
+      TARGET_LUFS: "-14"
+      DOWNLOAD_CONCURRENT_FRAGMENTS: "4"
+      MAX_JOB_RETRIES: "2"
+      JOB_TIMEOUT_SECONDS: "7200"
+    volumes:
+      - ./data/jobs:/data/jobs
+      - ./data/output:/data/output
+      - ./data/cache:/data/cache
+    depends_on:
+      - redis

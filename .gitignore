@@ -1,0 +1,51 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# App runtime data (host mounts)
+data/
+
+# Optional local db/temp
+*.sqlite3
+*.db
+
+# Node artifacts (if added later)
+node_modules/
+
+# Docker override/local files
+docker-compose.override.yml
