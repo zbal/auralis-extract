@@ -1,12 +1,11 @@
 from pathlib import Path
-import math
 import re
 import time
 from uuid import uuid4
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -135,46 +134,16 @@ def _find_similar_downloads(artist: str, title: str, exclude_url: str = "") -> l
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    recent_records = _sort_jobs_newest_first([r for r in list_jobs() if _is_listable_job(r)])[:3]
-    recent_items = [_build_download_view(r) for r in recent_records]
-    return templates.TemplateResponse("index.html", {**_base_context(request), "recent_items": recent_items})
+    records = _sort_jobs_newest_first([r for r in list_jobs() if _is_listable_job(r)])
+    job_items = [_build_download_view(r) for r in records]
+    return templates.TemplateResponse("index.html", {**_base_context(request), "job_items": job_items})
 
 
 @app.get("/downloads", response_class=HTMLResponse)
 def downloads_page(
     request: Request,
-    q: str = Query(""),
-    page: int = Query(1, ge=1),
 ):
-    records = [r for r in list_jobs() if _is_listable_job(r)]
-    filtered = _sort_jobs_newest_first(_filter_jobs(records, q))
-
-    per_page = max(1, settings.downloads_page_size)
-    total = len(filtered)
-    total_pages = max(1, math.ceil(total / per_page))
-    current_page = min(page, total_pages)
-    start = (current_page - 1) * per_page
-    page_records = filtered[start : start + per_page]
-
-    active_items = [_build_download_view(r) for r in page_records if r.get("status") in {"queued", "running"}]
-    completed_items = [_build_download_view(r) for r in page_records if r.get("status") == "completed"]
-
-    return templates.TemplateResponse(
-        "downloads.html",
-        {
-            **_base_context(request),
-            "active_items": active_items,
-            "completed_items": completed_items,
-            "query": q,
-            "query_encoded": quote_plus(q),
-            "page": current_page,
-            "total_pages": total_pages,
-            "per_page": per_page,
-            "total_results": total,
-            "has_prev": current_page > 1,
-            "has_next": current_page < total_pages,
-        },
-    )
+    return RedirectResponse(url="/", status_code=307)
 
 
 @app.get("/terms", response_class=HTMLResponse)
@@ -271,7 +240,15 @@ def create_job(payload: JobCreateRequest):
         retry=Retry(max=settings.max_job_retries, interval=[5, 15]),
         job_timeout=settings.job_timeout_seconds,
     )
-    return {"job_id": job_id, "status": STATUS_QUEUED, "url": ref.canonical_url, "video_id": ref.video_id}
+    return {
+        "job_id": job_id,
+        "status": STATUS_QUEUED,
+        "url": ref.canonical_url,
+        "video_id": ref.video_id,
+        "media_title": record.media_title,
+        "media_artist": record.media_artist,
+        "media_thumbnail_url": record.media_thumbnail_url,
+    }
 
 
 @app.get("/jobs/{job_id}")

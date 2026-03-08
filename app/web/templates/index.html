@@ -22,19 +22,13 @@
         background: radial-gradient(circle at 0% 0%, #fff4de, var(--bg) 45%);
       }
       .wrap {
-        max-width: 840px;
+        max-width: 920px;
         margin: 5vh auto;
         padding: 28px;
         background: var(--card);
         border: 1px solid #ede7de;
         border-radius: 16px;
         box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
-      }
-      .top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
       }
       .brand {
         display: flex;
@@ -54,12 +48,7 @@
       }
       .tagline {
         color: var(--muted);
-        margin: 6px 0 0;
-      }
-      .link-btn {
-        text-decoration: none;
-        color: var(--accent);
-        font-weight: 600;
+        margin: 8px 0 0;
       }
       input {
         width: 100%;
@@ -87,11 +76,12 @@
         background: #fffcf6;
       }
       .hidden { display: none; }
+      .job-item.hidden { display: none !important; }
       #status { margin-top: 0; white-space: pre-wrap; }
       .download-link { margin-top: 10px; display: inline-block; }
       .progress-wrap {
-        margin-top: 12px;
-        height: 10px;
+        margin-top: 8px;
+        height: 8px;
         width: 100%;
         background: #e6e1d8;
         border-radius: 999px;
@@ -127,17 +117,9 @@
         border-radius: 10px;
         padding: 10px;
         display: flex;
-        justify-content: space-between;
         gap: 10px;
         align-items: center;
         min-width: 0;
-      }
-      .mini-left {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        min-width: 0;
-        flex: 1;
       }
       .mini-thumb {
         width: 96px;
@@ -153,19 +135,88 @@
         overflow-wrap: anywhere;
         word-break: break-word;
       }
-      .panel-head {
+      .jobs-head {
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 10px;
       }
-      .see-more {
+      .jobs-search {
+        margin-top: 10px;
+      }
+      .jobs-list {
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .job-item {
+        border: 1px solid #e8e2d8;
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+      .job-left {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        min-width: 0;
+        flex: 1;
+      }
+      .job-left .text-wrap {
+        flex: 1;
+        width: 100%;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .actions > .icon-btn {
+        flex: 0 0 34px;
+      }
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        box-sizing: border-box;
+        border: 1px solid #ddd7cc;
+        border-radius: 8px;
+        background: #fff;
+        color: #374151;
+        padding: 0;
+        margin: 0;
+        vertical-align: middle;
+        line-height: 1;
+        font: inherit;
+        font-size: 0;
+        -webkit-appearance: none;
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         text-decoration: none;
-        color: var(--accent);
-        font-weight: 600;
+        cursor: pointer;
+      }
+      .icon-btn:hover { border-color: #b9b1a2; }
+      .icon-btn.danger { color: #991b1b; }
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        pointer-events: none;
+      }
+      button.icon-btn::-moz-focus-inner {
+        border: 0;
+        padding: 0;
       }
       .site-footer {
-        max-width: 840px;
+        max-width: 920px;
         margin: 0 auto 28px;
         padding: 10px 18px;
         display: flex;
@@ -188,50 +239,39 @@
   </head>
   <body>
     <main class="wrap">
-      <div class="top">
-        <div>
-          <div class="brand">
-            <img class="brand-logo" src="/static/logo.png" alt="Auralis Extract logo" />
-            <h1 class="brand-title">Auralis Extract</h1>
-          </div>
-          <p class="tagline">Single URL conversion, MP3 128k CBR, -14 LUFS normalization.</p>
-        </div>
-        <a class="link-btn" href="/downloads">Previous Downloads</a>
+      <div class="brand">
+        <img class="brand-logo" src="/static/logo.png" alt="Auralis Extract logo" />
+        <h1 class="brand-title">Auralis Extract</h1>
       </div>
+      <p class="tagline">Single URL conversion, MP3 128k CBR, -14 LUFS normalization.</p>
 
       <form id="job-form">
         <label for="url">Video URL</label>
         <input id="url" name="url" type="url" required placeholder="https://website.com/watch?v=..." />
         <button type="submit">Convert</button>
       </form>
+      <p id="form-message" class="muted hidden"></p>
 
       <section id="preview-panel" class="panel hidden"></section>
 
-      <section id="processing-panel" class="panel hidden">
-        <div id="status"></div>
-        <div class="progress-wrap" aria-hidden="true">
-          <div id="progress-bar" class="progress-bar"></div>
-        </div>
-        <a id="download" class="download-link" style="display:none" href="#">Download MP3</a>
-      </section>
-
-      <section id="similar-panel" class="panel hidden">
-        <h3>Similar Previous Files</h3>
-        <div id="similar-list" class="mini-list"></div>
-      </section>
-
       <section class="panel">
-        <div class="panel-head">
-          <h3>Last 3 Jobs</h3>
-          <a class="see-more" href="/downloads">See more</a>
+        <div class="jobs-head">
+          <h3>Jobs</h3>
+          <span class="muted" id="jobs-count"></span>
         </div>
-        {% if recent_items|length == 0 %}
-        <p class="muted">No jobs yet.</p>
-        {% else %}
-        <div class="mini-list">
-          {% for item in recent_items %}
-          <article class="mini-item">
-            <div class="mini-left">
+        <input id="jobs-search" class="jobs-search" type="text" placeholder="Search jobs by title, author, URL, status" />
+
+        <h4 class="muted">Running</h4>
+        <p id="no-running" class="muted hidden">No running jobs.</p>
+        <div id="running-list" class="jobs-list">
+          {% for item in job_items if item.status in ['queued', 'running'] %}
+          <article
+            class="job-item"
+            data-job-id="{{ item.job_id }}"
+            data-status="{{ item.status }}"
+            data-search="{{ (item.title ~ ' ' ~ item.artist ~ ' ' ~ item.source_url ~ ' ' ~ item.status)|lower }}"
+          >
+            <div class="job-left">
               {% if item.thumbnail_url %}
               <img class="mini-thumb" src="{{ item.thumbnail_url }}" alt="thumbnail" />
               {% else %}
@@ -240,13 +280,70 @@
               <div class="text-wrap">
                 <div><strong>{{ item.title }}</strong></div>
                 <div class="muted">Author: {{ item.artist }}</div>
-                <div class="muted">Status: {{ item.status }} | Progress: {{ item.progress }}%</div>
+                <div class="muted status-line">Status: {{ item.status }} | Stage: {{ item.stage }} | Progress: {{ item.progress }}%</div>
+                <div class="muted message-line">{{ item.message }}</div>
+                <div class="progress-wrap"><div class="progress-bar" style="width: {{ item.progress }}%"></div></div>
               </div>
+            </div>
+            <div class="actions">
+              {% if item.status == 'completed' %}
+              <a class="icon-btn download-icon" href="{{ item.download_url }}" title="Download" aria-label="Download">
+              {% else %}
+              <a class="icon-btn download-icon hidden" href="{{ item.download_url }}" title="Download" aria-label="Download">
+              {% endif %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+              </a>
+              <a class="icon-btn source-icon" href="{{ item.source_url }}" target="_blank" rel="noreferrer" title="View Source" aria-label="View Source">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>
+              </a>
+              <button type="button" class="icon-btn danger remove-btn" title="Remove" aria-label="Remove">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              </button>
             </div>
           </article>
           {% endfor %}
         </div>
-        {% endif %}
+
+        <h4 class="muted">Completed</h4>
+        <p id="no-completed" class="muted hidden">No completed jobs.</p>
+        <div id="completed-list" class="jobs-list">
+          {% for item in job_items if item.status == 'completed' %}
+          <article
+            class="job-item"
+            data-job-id="{{ item.job_id }}"
+            data-status="{{ item.status }}"
+            data-search="{{ (item.title ~ ' ' ~ item.artist ~ ' ' ~ item.source_url ~ ' ' ~ item.status)|lower }}"
+          >
+            <div class="job-left">
+              {% if item.thumbnail_url %}
+              <img class="mini-thumb" src="{{ item.thumbnail_url }}" alt="thumbnail" />
+              {% else %}
+              <div class="mini-thumb"></div>
+              {% endif %}
+              <div class="text-wrap">
+                <div><strong>{{ item.title }}</strong></div>
+                <div class="muted">Author: {{ item.artist }}</div>
+                <div class="muted status-line">Status: {{ item.status }} | Stage: {{ item.stage }} | Progress: {{ item.progress }}%</div>
+                <div class="muted message-line">{{ item.message }}</div>
+                <div class="progress-wrap"><div class="progress-bar" style="width: {{ item.progress }}%"></div></div>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="icon-btn download-icon" href="{{ item.download_url }}" title="Download" aria-label="Download">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+              </a>
+              <a class="icon-btn source-icon" href="{{ item.source_url }}" target="_blank" rel="noreferrer" title="View Source" aria-label="View Source">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>
+              </a>
+              <button type="button" class="icon-btn danger remove-btn" title="Remove" aria-label="Remove">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              </button>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+
+        <p id="no-jobs" class="muted hidden">No jobs found.</p>
       </section>
     </main>
 
@@ -262,31 +359,27 @@
     <script>
       const form = document.getElementById("job-form");
       const urlInput = document.getElementById("url");
-      const processingPanel = document.getElementById("processing-panel");
-      const statusEl = document.getElementById("status");
-      const downloadEl = document.getElementById("download");
-      const progressBar = document.getElementById("progress-bar");
+      const formMessage = document.getElementById("form-message");
       const previewPanel = document.getElementById("preview-panel");
-      const similarPanel = document.getElementById("similar-panel");
-      const similarList = document.getElementById("similar-list");
+      const jobsSearch = document.getElementById("jobs-search");
+      const runningList = document.getElementById("running-list");
+      const completedList = document.getElementById("completed-list");
+      const noRunning = document.getElementById("no-running");
+      const noCompleted = document.getElementById("no-completed");
+      const noJobs = document.getElementById("no-jobs");
+      const jobsCount = document.getElementById("jobs-count");
 
       let previewTimer = null;
       let lastPreviewVideoId = "";
       let lastPreview = null;
+      let isPollingJobs = false;
       const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
-      function setProcessingVisible(show) {
-        processingPanel.classList.toggle("hidden", !show);
-      }
-
-      function setStatus(text) {
-        setProcessingVisible(true);
-        statusEl.textContent = text;
-      }
-
-      function setProgress(value) {
-        const safe = Math.max(0, Math.min(100, Number(value || 0)));
-        progressBar.style.width = `${safe}%`;
+      function setFormMessage(text, isError = false) {
+        if (!formMessage) return;
+        formMessage.textContent = text || "";
+        formMessage.classList.toggle("hidden", !text);
+        formMessage.style.color = isError ? "#991b1b" : "";
       }
 
       function escapeHtml(value) {
@@ -381,82 +474,176 @@
         lastPreview = data;
         urlInput.value = data.url || parsedRef.canonicalUrl;
         renderPreview(data);
-        loadSimilar(data.artist || "", data.title || "", data.url || parsedRef.canonicalUrl);
       }
 
-      function renderSimilar(items) {
-        if (!items || items.length === 0) {
-          similarPanel.classList.add("hidden");
-          similarList.innerHTML = "";
-          return;
-        }
+      function updateJobCard(card, data) {
+        card.dataset.status = data.status || "unknown";
+        card.dataset.search = `${(data.media_title || "")} ${(data.media_artist || "")} ${(data.input_url || "")} ${(data.status || "")}`.toLowerCase();
 
-        similarList.innerHTML = items.map((item) => {
-          const thumb = item.thumbnail_url
-            ? `<img class="mini-thumb" src="${escapeHtml(item.thumbnail_url)}" alt="Thumbnail"/>`
-            : `<div class="mini-thumb"></div>`;
-          return `
-            <article class="mini-item">
-              <div class="mini-left">
-                ${thumb}
-                <div>
-                  <div class="text-wrap"><strong>${escapeHtml(item.title)}</strong></div>
-                  <div class="muted text-wrap">${escapeHtml(item.artist)}</div>
-                </div>
-              </div>
-              <div class="mini-actions">
-                <a href="${escapeHtml(item.download_url)}">Download</a>
-                <a href="${escapeHtml(item.process_url)}">Process URL</a>
-              </div>
-            </article>
-          `;
-        }).join("");
-        similarPanel.classList.remove("hidden");
-      }
-
-      async function loadSimilar(artist, title, excludeUrl) {
-        const q = new URLSearchParams({ artist: artist || "", title: title || "", exclude_url: excludeUrl || "" });
-        const resp = await fetch(`/similar?${q.toString()}`);
-        if (!resp.ok) return;
-        const data = await resp.json();
-        renderSimilar(data.items || []);
-      }
-
-      async function poll(jobId, sourceUrl) {
-        const resp = await fetch(`/jobs/${jobId}`);
-        const data = await resp.json();
+        const statusEl = card.querySelector(".status-line");
+        const messageEl = card.querySelector(".message-line");
+        const barEl = card.querySelector(".progress-bar");
+        const dlEl = card.querySelector(".download-icon");
 
         const stage = data.stage || "unknown";
         const progress = Number(data.progress || 0);
-        const message = data.message || "";
-        setProgress(progress);
-        setStatus(`Status: ${data.status}\nStage: ${stage}\nProgress: ${progress}%\n${message}`);
-
-        if (data.status === "completed") {
-          setProgress(100);
-          downloadEl.style.display = "inline-block";
-          downloadEl.href = `/download/${jobId}`;
-          const artist = data.media_artist || (lastPreview && lastPreview.artist) || "";
-          const title = data.media_title || (lastPreview && lastPreview.title) || "";
-          loadSimilar(artist, title, sourceUrl || data.input_url || "");
-          return;
+        if (statusEl) {
+          statusEl.textContent = `Status: ${data.status} | Stage: ${stage} | Progress: ${progress}%`;
         }
-        if (data.status === "failed") {
-          return;
+        if (messageEl) {
+          messageEl.textContent = data.message || "";
+        }
+        if (barEl) {
+          barEl.style.width = `${Math.max(0, Math.min(100, progress))}%`;
         }
 
-        setTimeout(() => poll(jobId, sourceUrl), 1500);
+        if (data.status === "completed" && dlEl) {
+          dlEl.classList.remove("hidden");
+          dlEl.setAttribute("href", `/download/${data.job_id}`);
+          if (card.parentElement === runningList) {
+            completedList.prepend(card);
+          }
+        }
+      }
+
+      function filterJobs() {
+        if (!runningList || !completedList) return;
+        const q = (jobsSearch.value || "").trim().toLowerCase();
+        const cards = [
+          ...runningList.querySelectorAll(".job-item"),
+          ...completedList.querySelectorAll(".job-item"),
+        ];
+        let shown = 0;
+        let runningShown = 0;
+        let completedShown = 0;
+        for (const card of cards) {
+          const hay = card.dataset.search || "";
+          const show = !q || hay.includes(q);
+          card.classList.toggle("hidden", !show);
+          if (show) {
+            shown += 1;
+            if (card.parentElement === runningList) runningShown += 1;
+            if (card.parentElement === completedList) completedShown += 1;
+          }
+        }
+        if (jobsCount) jobsCount.textContent = `${shown} shown`;
+        if (noRunning) noRunning.classList.toggle("hidden", runningShown !== 0);
+        if (noCompleted) noCompleted.classList.toggle("hidden", completedShown !== 0);
+        if (noJobs) {
+          noJobs.classList.toggle("hidden", shown !== 0);
+          if (shown === 0) noJobs.textContent = "No jobs found.";
+        }
+      }
+
+      async function removeJob(jobId, card) {
+        if (!jobId) return;
+        try {
+          const resp = await fetch(`/jobs/${jobId}`, { method: "DELETE" });
+          if (!resp.ok) return;
+          if (card) card.remove();
+          filterJobs();
+        } catch {
+          // no-op
+        }
+      }
+
+      function bindRemoveButtons() {
+        document.addEventListener("click", (e) => {
+          const target = e.target;
+          if (!(target instanceof Element)) return;
+          const btn = target.closest(".remove-btn");
+          if (!btn) return;
+          const card = btn.closest(".job-item");
+          if (!card) return;
+          const jobId = card.getAttribute("data-job-id");
+          removeJob(jobId, card);
+        });
+      }
+
+      function buildJobCard(job) {
+        const title = escapeHtml(job.media_title || (lastPreview && lastPreview.title) || "Unknown Title");
+        const artist = escapeHtml(job.media_artist || (lastPreview && lastPreview.artist) || "Unknown Artist");
+        const sourceUrl = escapeHtml(job.input_url || "");
+        const status = escapeHtml(job.status || "queued");
+        const stage = escapeHtml(job.stage || "queued");
+        const progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
+        const message = escapeHtml(job.message || "Queued");
+        const thumbUrl = job.media_thumbnail_url || (lastPreview && lastPreview.thumbnail_url) || "";
+        const thumb = thumbUrl
+          ? `<img class="mini-thumb" src="${escapeHtml(thumbUrl)}" alt="thumbnail" />`
+          : `<div class="mini-thumb"></div>`;
+
+        const article = document.createElement("article");
+        article.className = "job-item";
+        article.dataset.jobId = job.job_id;
+        article.dataset.status = job.status || "queued";
+        article.dataset.search = `${title} ${artist} ${sourceUrl} ${status}`.toLowerCase();
+        article.innerHTML = `
+          <div class="job-left">
+            ${thumb}
+            <div class="text-wrap">
+              <div><strong>${title}</strong></div>
+              <div class="muted">Author: ${artist}</div>
+              <div class="muted status-line">Status: ${status} | Stage: ${stage} | Progress: ${progress}%</div>
+              <div class="muted message-line">${message}</div>
+              <div class="progress-wrap"><div class="progress-bar" style="width: ${progress}%"></div></div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="icon-btn download-icon hidden" href="/download/${escapeHtml(job.job_id)}" title="Download" aria-label="Download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            </a>
+            <a class="icon-btn source-icon" href="${sourceUrl}" target="_blank" rel="noreferrer" title="View Source" aria-label="View Source">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>
+            </a>
+            <button type="button" class="icon-btn danger remove-btn" title="Remove" aria-label="Remove">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
+          </div>
+        `;
+        return article;
+      }
+
+      async function pollActiveJobs() {
+        if (!runningList || isPollingJobs) return;
+        isPollingJobs = true;
+        try {
+          while (true) {
+            const cards = [...runningList.querySelectorAll('.job-item[data-status="queued"], .job-item[data-status="running"]')];
+            if (!cards.length) break;
+
+            await Promise.all(
+              cards.map(async (card) => {
+                const jobId = card.getAttribute("data-job-id");
+                if (!jobId) return;
+                try {
+                  const resp = await fetch(`/jobs/${jobId}`);
+                  if (!resp.ok) return;
+                  const data = await resp.json();
+                  updateJobCard(card, data);
+                } catch {
+                  // keep existing UI state
+                }
+              })
+            );
+
+            filterJobs();
+            const stillActive = runningList.querySelector('.job-item[data-status="queued"], .job-item[data-status="running"]');
+            if (!stillActive) break;
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        } finally {
+          isPollingJobs = false;
+        }
       }
 
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        downloadEl.style.display = "none";
-        setProgress(0);
-        setStatus("Submitting job...");
+        setFormMessage("Submitting job...");
 
         const parsed = parseYouTubeInput(urlInput.value);
         if (!parsed) {
-          setStatus("Error: please provide a valid YouTube URL or 11-character video ID.");
+          setFormMessage("Error: please provide a valid YouTube URL or 11-character video ID.", true);
           return;
         }
         urlInput.value = parsed.canonicalUrl;
@@ -469,13 +656,26 @@
 
         if (!resp.ok) {
           const err = await resp.json();
-          setStatus(`Error: ${err.detail || "Request failed"}`);
+          setFormMessage(`Error: ${err.detail || "Request failed"}`, true);
           return;
         }
 
         const data = await resp.json();
-        setStatus(`Queued job: ${data.job_id}`);
-        poll(data.job_id, parsed.canonicalUrl);
+        const newCard = buildJobCard({
+          job_id: data.job_id,
+          input_url: parsed.canonicalUrl,
+          status: "queued",
+          stage: "queued",
+          progress: 0,
+          message: "Queued",
+          media_title: (lastPreview && lastPreview.title) || data.media_title,
+          media_artist: (lastPreview && lastPreview.artist) || data.media_artist,
+          media_thumbnail_url: (lastPreview && lastPreview.thumbnail_url) || data.media_thumbnail_url,
+        });
+        runningList.prepend(newCard);
+        filterJobs();
+        pollActiveJobs();
+        setFormMessage(`Queued job: ${data.job_id}`);
       });
 
       urlInput.addEventListener("input", () => {
@@ -486,8 +686,6 @@
             lastPreviewVideoId = "";
             lastPreview = null;
             previewPanel.classList.add("hidden");
-            similarPanel.classList.add("hidden");
-            similarList.innerHTML = "";
             return;
           }
           fetchPreview(parsed).catch((err) => {
@@ -497,7 +695,13 @@
         }, 1200);
       });
 
+      jobsSearch?.addEventListener("input", filterJobs);
+
       (function bootstrapFromQuery() {
+        bindRemoveButtons();
+        filterJobs();
+        pollActiveJobs();
+
         const params = new URLSearchParams(window.location.search);
         const jobId = params.get("job_id");
         const url = params.get("url");
@@ -514,8 +718,8 @@
                   fetchPreview(parsed);
                 }
               }
-              setProcessingVisible(true);
-              poll(jobId, job.input_url || "");
+              setFormMessage(`Tracking job: ${jobId}`);
+              pollActiveJobs();
             })
             .catch(() => {});
           return;

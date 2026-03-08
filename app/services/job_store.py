@@ -1,5 +1,7 @@
 import json
+import os
 from pathlib import Path
+import time
 from typing import Optional
 
 from app.core.config import settings
@@ -11,14 +13,21 @@ def _job_path(job_id: str) -> Path:
 
 
 def save_job(record: JobRecord) -> None:
-    _job_path(record.job_id).write_text(json.dumps(record.to_dict(), indent=2), encoding="utf-8")
+    _write_json_atomic(_job_path(record.job_id), record.to_dict())
 
 
 def load_job(job_id: str) -> Optional[dict]:
     path = _job_path(job_id)
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    # Worker and API may touch the same file concurrently; retry short transient reads.
+    for attempt in range(3):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            if attempt == 2:
+                return None
+            time.sleep(0.03)
 
 
 def list_jobs(include_removed: bool = False) -> list[dict]:
@@ -45,5 +54,11 @@ def mark_job_removed(job_id: str) -> bool:
     if record is None:
         return False
     record["removed"] = True
-    _job_path(job_id).write_text(json.dumps(record, indent=2), encoding="utf-8")
+    _write_json_atomic(_job_path(job_id), record)
     return True
+
+
+def _write_json_atomic(path: Path, payload: dict) -> None:
+    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(tmp, path)

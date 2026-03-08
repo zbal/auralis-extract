@@ -68,18 +68,16 @@ Open `http://localhost:8000`.
   - attempts to embed video thumbnail as cover art
 - Output filename:
   - normalized `ARTIST_ALBUM.mp3` with collision-safe suffix
-- Downloads page:
-  - ongoing jobs with live progress
-  - completed jobs
+- Main page includes running + past jobs in one list:
+  - live progress updates for active jobs
   - icon actions: download, open source, soft-delete
+  - in-page search/filter as you type
 - Similar files section on converter page based on artist/title matching
-- Homepage shows last 3 recent jobs with a quick link to full history
-- Downloads page supports full-list search + pagination
 
 ## API
 
 - `GET /` converter UI
-- `GET /downloads` downloads/history UI
+- `GET /downloads` redirects to `/` (legacy path)
 - `GET /preview?url=...` metadata preview
 - `GET /similar?artist=...&title=...&exclude_url=...` related previous files
 - `GET /terms` Terms & Conditions page
@@ -123,6 +121,7 @@ Main env vars used by `api`/`worker`:
 - `FFMPEG_THREADS`
 - `DOWNLOAD_CONCURRENT_FRAGMENTS`
 - `GITHUB_URL` (used in footer link)
+- `DOWNLOADS_PAGE_SIZE` (reserved for history pagination behavior)
 
 ## Operational Notes
 
