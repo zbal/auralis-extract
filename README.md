@@ -2,16 +2,15 @@
 
 <img src="app/web/static/logo.png" alt="Auralis Extract logo" width="120" />
 
-Containerized single-user YouTube-to-MP3 service with loudness normalization.
+Containerized single-user video-streaming platform to MP3 service with loudness normalization.
 
 ## Why This Project
 
 This project was built for a narrow personal use case:
-- I use Shokz swim earphones that only support MP3 files.
+- I use swimming headphones that only support MP3 files.
 - Bluetooth is not usable in the pool.
 - I like listening to podcast content available on YouTube.
 - Existing web-based “YouTube to MP3” converters are usually ad-heavy and low quality.
-- This tool is intended for personal use only.
 
 ## Legal Notice and Intended Use
 
@@ -21,6 +20,7 @@ This project was built for a narrow personal use case:
   - YouTube Terms of Service and any other platform terms
 - Do not use this project to infringe copyrights or bypass technical protections.
 - Maintainers/contributors do not provide legal advice and are not responsible for user misuse.
+- This project is intended for lawful personal use.
 
 ## Architecture
 
@@ -73,6 +73,8 @@ Open `http://localhost:8000`.
   - completed jobs
   - icon actions: download, open source, soft-delete
 - Similar files section on converter page based on artist/title matching
+- Homepage shows last 3 recent jobs with a quick link to full history
+- Downloads page supports full-list search + pagination
 
 ## API
 
@@ -128,3 +130,9 @@ Main env vars used by `api`/`worker`:
 - CAPTCHA bypass automation is intentionally out of scope.
 - Soft-deleted jobs are hidden from listings and treated as not found in API download/status endpoints.
 - License: MIT (see `LICENSE`).
+
+## Roadmap
+
+- Add provider abstraction for additional streaming sources if needed.
+- Introduce optional provider modules (for example, YouTube + future providers) behind a consistent interface.
+- Add richer filtering/analytics in downloads history as usage grows.

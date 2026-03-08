@@ -1,8 +1,9 @@
 from pathlib import Path
+import math
 import re
 import time
 from uuid import uuid4
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -64,6 +65,38 @@ def _build_download_view(record: dict) -> dict:
     }
 
 
+def _is_listable_job(record: dict) -> bool:
+    return record.get("status") in {"queued", "running", "completed"}
+
+
+def _filter_jobs(records: list[dict], query: str) -> list[dict]:
+    q = (query or "").strip().lower()
+    if not q:
+        return records
+
+    out: list[dict] = []
+    for record in records:
+        hay = " ".join(
+            [
+                str(record.get("media_title") or ""),
+                str(record.get("media_artist") or ""),
+                str(record.get("input_url") or ""),
+                str(record.get("status") or ""),
+            ]
+        ).lower()
+        if q in hay:
+            out.append(record)
+    return out
+
+
+def _sort_jobs_newest_first(records: list[dict]) -> list[dict]:
+    return sorted(
+        records,
+        key=lambda r: r.get("finished_at") or r.get("started_at") or r.get("created_at") or "",
+        reverse=True,
+    )
+
+
 def _find_similar_downloads(artist: str, title: str, exclude_url: str = "") -> list[dict]:
     artist_key = (artist or "").strip().lower()
     title_key = _title_similarity_key(title or "")
@@ -102,19 +135,45 @@ def _find_similar_downloads(artist: str, title: str, exclude_url: str = "") -> l
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", _base_context(request))
+    recent_records = _sort_jobs_newest_first([r for r in list_jobs() if _is_listable_job(r)])[:3]
+    recent_items = [_build_download_view(r) for r in recent_records]
+    return templates.TemplateResponse("index.html", {**_base_context(request), "recent_items": recent_items})
 
 
 @app.get("/downloads", response_class=HTMLResponse)
-def downloads_page(request: Request):
-    all_jobs = list_jobs()
-    active_records = [r for r in all_jobs if r.get("status") in {"queued", "running"}]
-    active_records.sort(key=lambda r: r.get("created_at") or "", reverse=True)
-    completed_items = [_build_download_view(r) for r in list_completed_jobs()]
-    active_items = [_build_download_view(r) for r in active_records]
+def downloads_page(
+    request: Request,
+    q: str = Query(""),
+    page: int = Query(1, ge=1),
+):
+    records = [r for r in list_jobs() if _is_listable_job(r)]
+    filtered = _sort_jobs_newest_first(_filter_jobs(records, q))
+
+    per_page = max(1, settings.downloads_page_size)
+    total = len(filtered)
+    total_pages = max(1, math.ceil(total / per_page))
+    current_page = min(page, total_pages)
+    start = (current_page - 1) * per_page
+    page_records = filtered[start : start + per_page]
+
+    active_items = [_build_download_view(r) for r in page_records if r.get("status") in {"queued", "running"}]
+    completed_items = [_build_download_view(r) for r in page_records if r.get("status") == "completed"]
+
     return templates.TemplateResponse(
         "downloads.html",
-        {**_base_context(request), "active_items": active_items, "completed_items": completed_items},
+        {
+            **_base_context(request),
+            "active_items": active_items,
+            "completed_items": completed_items,
+            "query": q,
+            "query_encoded": quote_plus(q),
+            "page": current_page,
+            "total_pages": total_pages,
+            "per_page": per_page,
+            "total_results": total,
+            "has_prev": current_page > 1,
+            "has_next": current_page < total_pages,
+        },
     )
 
 

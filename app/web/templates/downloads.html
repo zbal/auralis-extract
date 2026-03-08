@@ -38,6 +38,33 @@
         font-weight: 600;
         text-decoration: none;
       }
+      .search-row {
+        margin-top: 10px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .search-row input {
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #d6d3cc;
+        font-size: 14px;
+      }
+      .search-row button {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      .search-row button:hover { filter: brightness(0.95); }
+      .summary {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
       h2 {
         margin-top: 18px;
         margin-bottom: 8px;
@@ -119,6 +146,18 @@
         transition: width 300ms ease;
       }
       .hidden { display: none; }
+      .pager {
+        margin-top: 18px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+      }
+      .pager a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
       .site-footer {
         max-width: 980px;
         margin: 0 auto 28px;
@@ -137,13 +176,8 @@
         align-items: center;
         gap: 6px;
       }
-      .footer-link:hover {
-        color: var(--fg);
-      }
-      .footer-link svg {
-        width: 14px;
-        height: 14px;
-      }
+      .footer-link:hover { color: var(--fg); }
+      .footer-link svg { width: 14px; height: 14px; }
       @media (max-width: 680px) {
         .item { align-items: flex-start; }
         .thumb { width: 120px; }
@@ -157,11 +191,17 @@
         <a class="link-btn" href="/">Back to Converter</a>
       </div>
 
+      <form class="search-row" method="get" action="/downloads">
+        <input type="text" name="q" value="{{ query }}" placeholder="Search by title, author, URL, or status" />
+        <button type="submit">Search</button>
+      </form>
+      <p class="summary">{{ total_results }} result(s) | page {{ page }} / {{ total_pages }} | {{ per_page }} per page</p>
+
       <h2>Ongoing Jobs</h2>
       {% if active_items|length == 0 %}
-      <p id="no-active" class="muted">No ongoing jobs.</p>
+      <p id="no-active" class="muted">No ongoing jobs in this page/filter.</p>
       {% else %}
-      <p id="no-active" class="muted hidden">No ongoing jobs.</p>
+      <p id="no-active" class="muted hidden">No ongoing jobs in this page/filter.</p>
       {% endif %}
       <section id="active-list" class="list">
         {% for item in active_items %}
@@ -197,9 +237,9 @@
 
       <h2>Completed Jobs</h2>
       {% if completed_items|length == 0 %}
-      <p id="no-completed" class="muted">No completed downloads yet.</p>
+      <p id="no-completed" class="muted">No completed jobs in this page/filter.</p>
       {% else %}
-      <p id="no-completed" class="muted hidden">No completed downloads yet.</p>
+      <p id="no-completed" class="muted hidden">No completed jobs in this page/filter.</p>
       {% endif %}
       <section id="completed-list" class="list">
         {% for item in completed_items %}
@@ -229,7 +269,18 @@
         </article>
         {% endfor %}
       </section>
+
+      <nav class="pager">
+        {% if has_prev %}
+        <a href="/downloads?q={{ query_encoded }}&page={{ page - 1 }}">Previous</a>
+        {% endif %}
+        <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+        {% if has_next %}
+        <a href="/downloads?q={{ query_encoded }}&page={{ page + 1 }}">Next</a>
+        {% endif %}
+      </nav>
     </main>
+
     <footer class="site-footer">
       <a class="footer-link" href="{{ github_url }}" target="_blank" rel="noreferrer">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.3.8-.6v-2.3c-3.3.7-4-1.4-4-1.4-.6-1.4-1.3-1.8-1.3-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6A4.7 4.7 0 0 1 5.5 8c-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1a4.7 4.7 0 0 1 1.3 3.3c0 4.7-2.8 5.7-5.5 6 .4.4.8 1 .8 2v3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>

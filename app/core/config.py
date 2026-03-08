@@ -15,6 +15,7 @@ class Settings:
     target_lufs: int = int(os.getenv("TARGET_LUFS", "-14"))
     download_concurrent_fragments: int = int(os.getenv("DOWNLOAD_CONCURRENT_FRAGMENTS", "4"))
     github_url: str = os.getenv("GITHUB_URL", "https://github.com/zbal/auralis-extract")
+    downloads_page_size: int = int(os.getenv("DOWNLOADS_PAGE_SIZE", "10"))
     max_job_retries: int = int(os.getenv("MAX_JOB_RETRIES", "2"))
     job_timeout_seconds: int = int(os.getenv("JOB_TIMEOUT_SECONDS", "7200"))
 

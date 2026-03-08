@@ -21,6 +21,7 @@ services:
       NORMALIZATION_MODE: one_pass
       TARGET_LUFS: "-14"
       DOWNLOAD_CONCURRENT_FRAGMENTS: "4"
+      DOWNLOADS_PAGE_SIZE: "10"
       MAX_JOB_RETRIES: "2"
       JOB_TIMEOUT_SECONDS: "7200"
     volumes:
@@ -47,6 +48,7 @@ services:
       NORMALIZATION_MODE: one_pass
       TARGET_LUFS: "-14"
       DOWNLOAD_CONCURRENT_FRAGMENTS: "4"
+      DOWNLOADS_PAGE_SIZE: "10"
       MAX_JOB_RETRIES: "2"
       JOB_TIMEOUT_SECONDS: "7200"
     volumes:
