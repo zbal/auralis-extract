@@ -37,6 +37,7 @@ Why multi-container:
 
 Host-mounted by default:
 - `./data/jobs` -> job JSON state
+- `./data/playlists` -> playlist JSON state
 - `./data/output` -> generated MP3 files
 - `./data/cache` -> metadata/thumbnail cache
 
@@ -50,42 +51,55 @@ Open `http://localhost:8000`.
 
 ## Current Behavior
 
-- Input accepts:
-  - full YouTube URLs (`youtube.com`, `youtu.be`, `shorts`, `embed`, extra params)
-  - raw 11-char YouTube video ID
-- Input is normalized to canonical URL:
-  - `https://www.youtube.com/watch?v=VIDEO_ID`
-- Preview fetch shows title/artist/thumbnail
-- Output: MP3 (`128k CBR`)
-- Loudness normalization default:
-  - target `-14 LUFS`
-  - `NORMALIZATION_MODE=one_pass` (speed default)
-- Progress telemetry:
-  - `stage` + `% progress` + status message
-- ID3 tags:
-  - `title`, `artist`, `album`
-- Thumbnail embedding:
-  - attempts to embed video thumbnail as cover art
-- Output filename:
-  - normalized `ARTIST_ALBUM.mp3` with collision-safe suffix
-- Main page includes running + past jobs in one list:
-  - live progress updates for active jobs
+- Main intake accepts:
+  - video URLs/IDs
+  - playlist URLs/IDs
+- Video input behavior:
+  - normalized to canonical URL `https://www.youtube.com/watch?v=VIDEO_ID`
+  - queued as extraction job
+- Playlist input behavior (from main page):
+  - upsert playlist record (add/update/restore)
+  - auto-sync playlist metadata/entries
+  - shows inline status message on main page
+  - Playlists button receives temporary visual highlight cue
+- Output profile:
+  - MP3 (`128k CBR`)
+  - loudness target `-14 LUFS` (default)
+  - `NORMALIZATION_MODE=one_pass` default (speed)
+- Metadata and output:
+  - ID3 tags: `title`, `artist`, `album`
+  - embeds thumbnail as cover art when available
+  - filename format `ARTIST_ALBUM.mp3` (collision-safe suffix)
+- Job UX (single main page):
+  - running jobs with live progress (`stage`, `%`, message)
+  - completed jobs list with incremental pagination:
+    - initial 5
+    - `Show more` reveals +10 each click
   - icon actions: download, open source, soft-delete
-  - in-page search/filter as you type
-- Similar files section on converter page based on artist/title matching
+- Playlist UX (`/playlists` page):
+  - add playlist
+  - per-playlist actions: open source, sync, fetch (all / 10 newest), delete
+  - expanding a playlist shows downloaded items + download buttons
+  - fetch flow deduplicates already queued/running/completed streams
+  - temporarily unavailable streams are skipped and retried on later fetch/sync
 
 ## API
 
 - `GET /` converter UI
+- `GET /playlists` playlist management UI
 - `GET /downloads` redirects to `/` (legacy path)
 - `GET /preview?url=...` metadata preview
-- `GET /similar?artist=...&title=...&exclude_url=...` related previous files
 - `GET /terms` Terms & Conditions page
 - `GET /fair-usage` Fair Usage page
 - `POST /jobs` enqueue conversion (`{ "url": "..." }`)
 - `GET /jobs/{job_id}` job status
 - `DELETE /jobs/{job_id}` soft-delete job entry
 - `GET /download/{job_id}` download completed MP3
+- `POST /playlists` add/update playlist (form)
+- `POST /playlists/intake` add/update playlist from main-page JSON intake
+- `POST /playlists/{playlist_id}/sync` sync playlist entries
+- `POST /playlists/{playlist_id}/fetch-all` queue missing streams (`mode=all|newest10`)
+- `POST /playlists/{playlist_id}/delete` soft-delete playlist
 
 ## Performance Tuning
 
@@ -110,6 +124,7 @@ Note: multiple workers improve concurrency/queue time, not single-file latency.
 Main env vars used by `api`/`worker`:
 - `REDIS_URL`
 - `JOBS_DIR`
+- `PLAYLISTS_DIR`
 - `OUTPUT_DIR`
 - `TEMP_DIR`
 - `METADATA_CACHE_DIR`
@@ -121,7 +136,7 @@ Main env vars used by `api`/`worker`:
 - `FFMPEG_THREADS`
 - `DOWNLOAD_CONCURRENT_FRAGMENTS`
 - `GITHUB_URL` (used in footer link)
-- `DOWNLOADS_PAGE_SIZE` (reserved for history pagination behavior)
+- `DOWNLOADS_PAGE_SIZE` (legacy/reserved)
 
 ## Operational Notes
 
@@ -134,4 +149,5 @@ Main env vars used by `api`/`worker`:
 
 - Add provider abstraction for additional streaming sources if needed.
 - Introduce optional provider modules (for example, YouTube + future providers) behind a consistent interface.
-- Add richer filtering/analytics in downloads history as usage grows.
+- Add richer filtering/analytics as usage grows.
+- Add scheduled playlist sync jobs (optional auto-refresh).
