@@ -1,21 +1,21 @@
-# Auralis Extract Strategy (As Implemented)
+# Auralis Extract Strategy (Current)
 
 ## 1. Goal and Scope
 
-Build a single-user web app that converts YouTube videos to normalized MP3 with a simple operational UX.
+Build a single-user, containerized web app that extracts audio from supported video-streaming URLs to normalized MP3 with a minimal, reliable UX.
 
 Current in-scope behavior:
-- Accept YouTube input as full URL or raw video ID
-- Normalize and canonicalize input to one URL shape
+- Accept provider URL input (currently YouTube implementation)
+- Normalize input to canonical URL format
 - Download audio, transcode to MP3, normalize loudness
 - Embed metadata and thumbnail when available
-- Track jobs with live stage/progress updates
-- Keep download history with actions (download, source, remove)
+- Track running/completed jobs on the main page with live progress
+- Provide per-job actions: download output, open source URL, remove entry
 
-Out of scope:
+Out of scope (current release):
 - Account system / multi-tenant auth
 - Captcha bypass tooling
-- Full playlist workflow (future phase)
+- Playlist sync/download lifecycle (planned next phase)
 
 ## 2. Locked Product Decisions (Current)
 
@@ -23,137 +23,136 @@ Out of scope:
 - Queue: RQ + Redis
 - Downloader: yt-dlp
 - Media pipeline: ffmpeg/ffprobe
-- Output: MP3 128k CBR
+- Output profile: MP3 128k CBR
 - Loudness target default: `-14 LUFS` (configurable)
-- Deployment mode: single-user, containerized
-- Storage: host bind mounts (`./data/*`) for easy backup/migration
+- Deployment: Docker Compose (API + worker + Redis)
+- Storage strategy: host bind mounts (`./data/*`) for backup/migration simplicity
 
 ## 3. Runtime Architecture
 
-Services (docker-compose):
-- `api`: FastAPI + HTML templates
-- `worker`: background RQ worker for media processing
+Services:
+- `api`: FastAPI, server-rendered templates, job APIs
+- `worker`: RQ worker executing media pipeline
 - `redis`: queue backend
 
 Storage mounts:
 - `./data/jobs` -> `/data/jobs` (job JSON state)
-- `./data/output` -> `/data/output` (MP3 outputs)
-- `./data/cache` -> `/data/cache` (metadata/thumbnail cache)
+- `./data/output` -> `/data/output` (generated MP3 files)
+- `./data/cache` -> `/data/cache` (provider metadata/thumbnail cache)
 
-## 4. Input and URL Normalization Strategy
+## 4. Provider Strategy (Extensible)
 
-Input accepted:
-- Full YouTube links (`youtube.com`, `youtu.be`, `shorts`, `embed`, extra query params)
-- Raw 11-character YouTube video ID
+Provider code is structured to support future sources:
+- `app/providers/youtube/` contains YouTube parsing/validation/API behavior
+- API routes use provider helpers for canonicalization and validation
 
-Normalization behavior:
-- Extract only valid video ID
-- Reject invalid/non-YouTube inputs early
-- Canonicalize to: `https://www.youtube.com/watch?v=VIDEO_ID`
+Design intent:
+- Keep provider-specific logic isolated
+- Add future providers under `app/providers/<provider>/` with similar shape
 
-Anti-spam behavior:
-- Frontend does local validation before preview request
-- Debounced preview fetch (delayed query)
-- API in-memory preview cache + disk cache reuse
+## 5. Input Canonicalization and Request Hygiene
 
-## 5. Processing Pipeline (Worker)
+Current behavior:
+- Accept full provider links and raw provider IDs (YouTube: 11-char video ID)
+- Strip extraneous query parameters and keep canonical identity only
+- Canonical form (YouTube): `https://www.youtube.com/watch?v=VIDEO_ID`
+- Reject invalid/non-supported input early
 
-1. Resolve canonical URL + video ID
-2. Load metadata from cache, else fetch via yt-dlp
-3. Download best audio via yt-dlp
-4. Normalize + transcode to MP3 via ffmpeg
+Anti-spam and efficiency controls:
+- Frontend debounced metadata prefetch
+- In-memory + disk metadata cache by video ID
+- In-flight request deduplication per video ID
+- No continuous polling when no active jobs remain
+
+## 6. Processing Pipeline (Worker)
+
+1. Resolve canonical URL + provider identity
+2. Load metadata from cache or fetch via provider/downloader
+3. Download best audio stream
+4. Normalize + transcode to MP3
 5. Write ID3 tags and embed cover art when available
-6. Persist job state and cleanup temp files
+6. Persist job updates by stage/progress
+7. Move output to mounted output storage and cleanup temp files
 
 Output naming:
 - Sanitized format: `ARTIST_ALBUM.mp3`
-- Collision-safe suffix when needed
+- Collision-safe suffix when required
 
-Metadata tagging:
-- `title`: YouTube title
-- `artist`: uploader/channel
-- `album`: YouTube title
-- cover art: video thumbnail when available
+Metadata mapping:
+- `title`: media title
+- `artist`: uploader/channel/provider author
+- `album`: media title
+- cover art: thumbnail image when available
 
-## 6. Loudness and Performance Strategy
+## 7. Loudness and Performance Strategy
 
 Normalization:
-- `loudnorm` with target LUFS (configurable via env)
-- Default target: `-14 LUFS`
+- `loudnorm` target default `-14 LUFS`
+- configurable via environment
 
 Performance modes:
-- `NORMALIZATION_MODE=one_pass` (default; faster)
-- `NORMALIZATION_MODE=two_pass` (slower; higher precision)
+- `NORMALIZATION_MODE=one_pass` (default, faster)
+- `NORMALIZATION_MODE=two_pass` (more precise, slower)
 
-Additional speed knobs:
-- `FFMPEG_THREADS` (default `0` = ffmpeg auto)
-- `DOWNLOAD_CONCURRENT_FRAGMENTS` (default `4`)
+Performance controls:
+- `FFMPEG_THREADS` (`0` = ffmpeg auto)
+- `DOWNLOAD_CONCURRENT_FRAGMENTS`
+- `JOB_TIMEOUT_SECONDS` high enough for long files
+- Optional multiple workers for throughput (concurrent jobs), not single-file acceleration
 
-Queue timeout:
-- `JOB_TIMEOUT_SECONDS` default `7200` for long media
+## 8. UI Strategy (Current)
 
-## 7. UI Strategy
+Main page (`/`) only:
+- Brand header + short CTA
+- URL input with inline `Extract` button
+- Enter key on URL input triggers submit
+- Running jobs section appears only when active jobs exist
+- Completed jobs section always available
+- Job cards show thumbnail/title/author/status/stage/progress
+- Job actions: download, source link, remove
 
-Converter page (`/`):
-- URL input + preview panel (title/artist/thumbnail)
-- Submit job
-- Live status (`stage`, `% progress`, message)
-- Similar previous files section
+Removed UX elements (intentionally):
+- Separate downloads page workflow
+- Similar-files suggestions
+- In-page “detected media” preview panel
+- Search/filter bar
 
-Downloads page (`/downloads`):
-- Ongoing jobs section with progress bars and polling
-- Completed jobs section
-- Right-side icon actions per item:
-  - download
-  - open source URL
-  - soft-delete entry
-- Polling stops when no active jobs remain
+## 9. API Surface (Current)
 
-## 8. API Surface (Current)
-
-- `GET /` : converter UI
-- `GET /downloads` : history UI
-- `GET /preview?url=...` : metadata preview
-- `GET /similar?artist=...&title=...&exclude_url=...` : related history
-- `POST /jobs` : enqueue conversion
+- `GET /` : main UI
+- `GET /downloads` : redirect to `/`
+- `GET /preview?url=...` : metadata prefetch endpoint
+- `POST /jobs` : enqueue extraction job
 - `GET /jobs/{job_id}` : job state
 - `DELETE /jobs/{job_id}` : soft-delete job entry
-- `GET /download/{job_id}` : download MP3 when completed
+- `GET /download/{job_id}` : download output when completed
+- `GET /terms` : Terms page
+- `GET /fair-usage` : Fair Usage page
 
-## 9. Data Model and Retention
+## 10. Data and Retention
 
-Job JSON includes:
-- identity and timing (`job_id`, `created_at`, etc.)
+Job record includes:
+- IDs/timestamps
 - input/canonical URL
 - status/stage/progress/message
-- media metadata (title, artist, thumbnail URL)
-- output filename
-- loudness target, error code
-- `removed` flag for soft-delete
+- media metadata (title, artist, thumbnail)
+- output filename/path metadata
+- error code/message when failed
+- soft-delete marker (`removed`)
 
-Caching:
-- Metadata cache by video ID
-- Thumbnail cache by video ID
-- Reused by both API and worker to reduce provider calls
+Cache model:
+- metadata and thumbnail cache keyed by video ID
+- reused by preview API and worker to reduce repeated upstream requests
 
-## 10. Operational Guardrails
+## 11. Operational Guardrails
 
-- No captcha bypass implementation
-- Retry policy for transient job failures
-- Input/domain validation and canonicalization
-- Filename sanitization
-- Job soft-delete in UI (record hidden from listings)
+- No captcha-bypass implementation
+- Early input validation + canonicalization
+- Retry policy for transient failures
+- Atomic job file writes and tolerant reads
+- Soft-delete in UI/history without destructive source manipulation
 
-## 11. Known Tradeoffs
+## 12. Related Strategies
 
-- Single-job speed is bounded by media decode/filter/encode path
-- Multiple workers improve throughput for multiple jobs, not a single-file latency jump
-- `one_pass` normalization is faster but less exact than two-pass
-
-## 12. Next Evolution Path
-
-1. Playlist resolver layer (parent/child jobs)
-2. Retention policy + cleanup job (old outputs/cache)
-3. Optional SQLite index for richer filtering/search
-4. Optional SSE/WebSocket updates (replace polling)
-5. Optional quality/profile presets in UI (fast vs precise)
+Playlist management is tracked separately in:
+- `strategy/playlist-management-strategy.md`

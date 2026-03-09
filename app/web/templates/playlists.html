@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auralis Extract - Playlists</title>
+    <link rel="icon" type="image/x-icon" href="/static/logo.ico" />
+    <style>
+      :root {
+        --bg: #f4f1eb;
+        --fg: #1f2937;
+        --card: #fffdf8;
+        --accent: #0f766e;
+        --accent-hover: #115e59;
+        --muted: #6b7280;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--fg);
+        background: radial-gradient(circle at 0% 0%, #fff4de, var(--bg) 45%);
+      }
+      .wrap {
+        max-width: 920px;
+        margin: 5vh auto;
+        padding: 28px;
+        background: var(--card);
+        border: 1px solid #ede7de;
+        border-radius: 16px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .topbar a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .topbar a:hover { text-decoration: underline; }
+      .muted { color: var(--muted); }
+      .notice {
+        margin-top: 12px;
+        border: 1px solid #cfe9e5;
+        background: #f2fbf9;
+        color: #0f766e;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      .notice.info {
+        border-color: #d9e2ec;
+        background: #f8fafc;
+        color: #475569;
+      }
+      .add-form {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+      }
+      .add-form input {
+        flex: 1;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #d6d3cc;
+        font-size: 15px;
+      }
+      .add-form button,
+      .action-btn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .add-form button:hover,
+      .action-btn:hover { background: var(--accent-hover); }
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        box-sizing: border-box;
+        border: 1px solid #ddd7cc;
+        border-radius: 8px;
+        background: #fff;
+        color: #374151;
+        padding: 0;
+        margin: 0;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .icon-btn:hover { border-color: #b9b1a2; }
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+        pointer-events: none;
+      }
+      .danger-btn {
+        background: #f9fafb;
+        color: #991b1b;
+        border: 1px solid #e5e7eb;
+      }
+      .danger-btn:hover { background: #f3f4f6; }
+      .list {
+        margin-top: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .item {
+        border: 1px solid #e8e2d8;
+        border-radius: 10px;
+        background: #fffcf6;
+        min-width: 0;
+      }
+      details { padding: 12px; }
+      summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        min-width: 0;
+      }
+      summary::-webkit-details-marker { display: none; }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+        gap: 8px;
+        margin-top: 6px;
+        font-size: 14px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+        position: relative;
+      }
+      .actions form { margin: 0; }
+      .fetch-menu {
+        position: relative;
+      }
+      .fetch-popover {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 10;
+        min-width: 138px;
+        background: #fff;
+        border: 1px solid #ddd7cc;
+        border-radius: 8px;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+        padding: 6px;
+        display: none;
+      }
+      .fetch-menu.open .fetch-popover {
+        display: grid;
+        gap: 6px;
+      }
+      .fetch-option {
+        width: 100%;
+        border: 1px solid #ddd7cc;
+        border-radius: 8px;
+        background: #fff;
+        color: #374151;
+        font-size: 13px;
+        padding: 7px 8px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .fetch-option:hover {
+        border-color: #b9b1a2;
+        background: #faf8f4;
+      }
+      .downloads {
+        margin-top: 12px;
+        border-top: 1px solid #eee7da;
+        padding-top: 12px;
+        display: grid;
+        gap: 10px;
+        width: 100%;
+        min-width: 0;
+      }
+      .dl-item {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        border: 1px solid #ebe4d9;
+        border-radius: 8px;
+        padding: 8px;
+        width: 100%;
+        min-width: 0;
+      }
+      .thumb {
+        width: 86px;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        border-radius: 6px;
+        background: #ececec;
+      }
+      .dl-info { min-width: 0; flex: 1; }
+      .dl-info .title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row-main {
+        min-width: 0;
+        flex: 1;
+      }
+      .site-footer {
+        max-width: 920px;
+        margin: 0 auto 28px;
+        padding: 10px 18px;
+        display: flex;
+        justify-content: center;
+        gap: 18px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .footer-link {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .footer-link:hover { color: var(--fg); }
+      @media (max-width: 760px) {
+        .meta {
+          grid-template-columns: 1fr;
+        }
+        summary {
+          flex-direction: column;
+        }
+        .actions {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="topbar">
+        <h1 style="margin:0;">Playlists</h1>
+        <a href="/">Back to Extract</a>
+      </div>
+
+      <form class="add-form" method="post" action="/playlists">
+        <input
+          name="url"
+          type="text"
+          required
+          placeholder="https://www.youtube.com/playlist?list=..."
+        />
+        <button type="submit">Add Playlist</button>
+      </form>
+      {% if notice == "added" %}
+      <div class="notice">Playlist added. Use Sync to refresh streams, then Fetch to queue downloads.</div>
+      {% elif notice == "restored" %}
+      <div class="notice">Playlist restored. It is active again.</div>
+      {% elif notice == "synced" %}
+      <div class="notice">Playlist synced successfully.</div>
+      {% elif notice == "sync_failed" %}
+      <div class="notice info">Playlist saved, but sync failed. Try Sync again.</div>
+      {% elif notice == "updated" %}
+      <div class="notice info">Playlist updated and active.</div>
+      {% elif notice == "exists" %}
+      <div class="notice info">Playlist updated and active.</div>
+      {% endif %}
+
+      <section class="list">
+        {% if playlist_items %}
+          {% for item in playlist_items %}
+          <article class="item">
+            <details>
+              <summary>
+                <div class="row-main">
+                  <div><strong>{{ item.title }}</strong></div>
+                  <div class="meta muted">
+                    <div>Last sync: {{ item.last_sync_label }}</div>
+                    <div>Streams: {{ item.total_streams }}</div>
+                    <div>Fetched: {{ item.fetched_streams }}</div>
+                  </div>
+                </div>
+                <div class="actions">
+                  {% if item.source_url %}
+                  <a class="icon-btn" href="{{ item.source_url }}" target="_blank" rel="noreferrer" title="Open playlist source" aria-label="Open playlist source">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>
+                  </a>
+                  {% endif %}
+                  <form method="post" action="/playlists/{{ item.playlist_id }}/sync">
+                    <button class="icon-btn" type="submit" title="Sync playlist" aria-label="Sync playlist">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15.5-6.4"/><path d="M19 3v4h-4"/><path d="M21 12a9 9 0 0 1-15.5 6.4"/><path d="M5 21v-4h4"/></svg>
+                    </button>
+                  </form>
+                  <div class="fetch-menu">
+                    <button class="icon-btn fetch-toggle" type="button" title="Fetch options" aria-label="Fetch options">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                    </button>
+                    <div class="fetch-popover" role="menu" aria-label="Fetch options">
+                      <form method="post" action="/playlists/{{ item.playlist_id }}/fetch-all">
+                        <input type="hidden" name="mode" value="all" />
+                        <button class="fetch-option" type="submit">All</button>
+                      </form>
+                      <form method="post" action="/playlists/{{ item.playlist_id }}/fetch-all">
+                        <input type="hidden" name="mode" value="newest10" />
+                        <button class="fetch-option" type="submit">10 newest</button>
+                      </form>
+                    </div>
+                  </div>
+                  <form method="post" action="/playlists/{{ item.playlist_id }}/delete">
+                    <button class="icon-btn danger-btn" type="submit" title="Delete playlist" aria-label="Delete playlist">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                    </button>
+                  </form>
+                </div>
+              </summary>
+
+              <div class="downloads">
+                {% if item.downloaded_items %}
+                  {% for dl in item.downloaded_items %}
+                  <div class="dl-item">
+                    {% if dl.thumbnail_url %}
+                    <img class="thumb" src="{{ dl.thumbnail_url }}" alt="thumbnail" />
+                    {% else %}
+                    <div class="thumb"></div>
+                    {% endif %}
+                    <div class="dl-info">
+                      <div class="title"><strong>{{ dl.title }}</strong></div>
+                      <div class="muted">Author: {{ dl.artist }}</div>
+                    </div>
+                    <a class="icon-btn" href="{{ dl.download_url }}" title="Download" aria-label="Download">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                    </a>
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="muted">No downloaded streams for this playlist yet.</div>
+                {% endif %}
+              </div>
+            </details>
+          </article>
+          {% endfor %}
+        {% else %}
+          <p class="muted">No playlists yet.</p>
+        {% endif %}
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="footer-link" href="/">Extract</a>
+      <a class="footer-link" href="/playlists">Playlists</a>
+      <a class="footer-link" href="{{ github_url }}" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="footer-link" href="/terms">Terms &amp; Conditions</a>
+      <a class="footer-link" href="/fair-usage">Fair Usage</a>
+    </footer>
+    <script>
+      document.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!(target instanceof Element)) return;
+
+        if (target.closest(".actions form button")) {
+          e.stopPropagation();
+        }
+        if (target.closest(".actions a.icon-btn")) {
+          e.stopPropagation();
+        }
+
+        const toggle = target.closest(".fetch-toggle");
+        if (toggle) {
+          e.preventDefault();
+          e.stopPropagation();
+          const menu = toggle.closest(".fetch-menu");
+          if (!menu) return;
+          const wasOpen = menu.classList.contains("open");
+          document.querySelectorAll(".fetch-menu.open").forEach((el) => el.classList.remove("open"));
+          if (!wasOpen) menu.classList.add("open");
+          return;
+        }
+
+        if (!target.closest(".fetch-menu")) {
+          document.querySelectorAll(".fetch-menu.open").forEach((el) => el.classList.remove("open"));
+        }
+      });
+    </script>
+  </body>
+</html>

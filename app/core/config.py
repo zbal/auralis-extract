@@ -6,6 +6,7 @@ class Settings:
     app_name: str = "auralis-extract"
     redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     jobs_dir: Path = Path(os.getenv("JOBS_DIR", "/data/jobs"))
+    playlists_dir: Path = Path(os.getenv("PLAYLISTS_DIR", "/data/playlists"))
     output_dir: Path = Path(os.getenv("OUTPUT_DIR", "/data/output"))
     temp_dir: Path = Path(os.getenv("TEMP_DIR", "/tmp/auralis-extract"))
     metadata_cache_dir: Path = Path(os.getenv("METADATA_CACHE_DIR", "/data/cache/metadata"))
@@ -23,6 +24,7 @@ class Settings:
 settings = Settings()
 
 settings.jobs_dir.mkdir(parents=True, exist_ok=True)
+settings.playlists_dir.mkdir(parents=True, exist_ok=True)
 settings.output_dir.mkdir(parents=True, exist_ok=True)
 settings.temp_dir.mkdir(parents=True, exist_ok=True)
 settings.metadata_cache_dir.mkdir(parents=True, exist_ok=True)

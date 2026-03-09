@@ -25,6 +25,7 @@ class JobRecord:
     finished_at: Optional[str] = None
     message: Optional[str] = None
     output_filename: Optional[str] = None
+    source_video_id: Optional[str] = None
     media_title: Optional[str] = None
     media_artist: Optional[str] = None
     media_thumbnail_url: Optional[str] = None
@@ -35,3 +36,9 @@ class JobRecord:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "JobRecord":
+        allowed = cls.__dataclass_fields__.keys()
+        filtered = {k: v for k, v in payload.items() if k in allowed}
+        return cls(**filtered)

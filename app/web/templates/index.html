@@ -33,8 +33,15 @@
       .brand {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 12px;
         margin-bottom: 16px;
+      }
+      .brand-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
       }
       .brand-logo {
         width: 44px;
@@ -62,6 +69,38 @@
       }
       .tagline a:hover {
         text-decoration: underline;
+      }
+      .playlists-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #ddd7cc;
+        background: #fff;
+        color: var(--fg);
+        text-decoration: none;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+      .playlists-link:hover {
+        border-color: #b9b1a2;
+      }
+      .playlists-link.highlight-added {
+        background: #ecfdf5;
+        color: #065f46;
+        border-color: #6ee7b7;
+      }
+      .playlists-link.slow-blink {
+        animation: playlistsBlink 1.6s ease-in-out infinite;
+      }
+      .playlists-link svg {
+        width: 14px;
+        height: 14px;
+      }
+      @keyframes playlistsBlink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.45; }
       }
       input {
         width: 100%;
@@ -153,6 +192,12 @@
         grid-template-columns: 1fr;
         gap: 10px;
       }
+      .show-more-btn {
+        margin-top: 12px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
       .job-item {
         border: 1px solid #e8e2d8;
         border-radius: 10px;
@@ -238,19 +283,34 @@
       }
       .footer-link:hover { color: var(--fg); }
       .footer-link svg { width: 14px; height: 14px; }
+      @media (max-width: 760px) {
+        .brand {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .playlists-link {
+          align-self: flex-start;
+        }
+      }
     </style>
   </head>
   <body>
     <main class="wrap">
       <div class="brand">
-        <img class="brand-logo" src="/static/logo.png" alt="Auralis Extract logo" />
-        <div class="brand-copy">
-          <h1 class="brand-title">Auralis Extract</h1>
-          <p class="tagline">
-            Your own MP3 extractor: no ads, no noise.
-            <a href="{{ github_url }}" target="_blank" rel="noreferrer">Get the code</a>.
-          </p>
+        <div class="brand-main">
+          <img class="brand-logo" src="/static/logo.png" alt="Auralis Extract logo" />
+          <div class="brand-copy">
+            <h1 class="brand-title">Auralis Extract</h1>
+            <p class="tagline">
+              Your own MP3 extractor: no ads, no noise.
+              <a href="{{ github_url }}" target="_blank" rel="noreferrer">Get the code</a>.
+            </p>
+          </div>
         </div>
+        <a id="playlists-link" class="playlists-link" href="/playlists" title="Manage playlists">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><circle cx="3" cy="6" r="1.5"/><circle cx="3" cy="12" r="1.5"/><circle cx="3" cy="18" r="1.5"/></svg>
+          Playlists
+        </a>
       </div>
 
       <form id="job-form">
@@ -344,6 +404,7 @@
           </article>
           {% endfor %}
         </div>
+        <button id="show-more-jobs" class="show-more-btn hidden" type="button">Show more</button>
 
         <p id="no-jobs" class="muted hidden">No jobs found.</p>
       </section>
@@ -355,6 +416,7 @@
         GitHub
       </a>
       <a class="footer-link" href="/terms">Terms &amp; Conditions</a>
+      <a class="footer-link" href="/playlists">Playlists</a>
       <a class="footer-link" href="/fair-usage">Fair Usage</a>
     </footer>
 
@@ -367,12 +429,18 @@
       const runningSection = document.getElementById("running-section");
       const noCompleted = document.getElementById("no-completed");
       const noJobs = document.getElementById("no-jobs");
+      const showMoreJobsBtn = document.getElementById("show-more-jobs");
+      const playlistsLink = document.getElementById("playlists-link");
 
       let previewTimer = null;
       let isPollingJobs = false;
       const previewByVideoId = new Map();
       const previewInflightByVideoId = new Map();
       const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+      const PLAYLIST_ID_RE = /^[A-Za-z0-9_-]{10,}$/;
+      const INITIAL_COMPLETED_VISIBLE = 5;
+      const COMPLETED_PAGE_STEP = 10;
+      let completedVisibleCount = INITIAL_COMPLETED_VISIBLE;
 
       function updateRunningSectionVisibility() {
         if (!runningSection || !runningList) return;
@@ -446,6 +514,41 @@
         return { videoId, canonicalUrl: `https://www.youtube.com/watch?v=${videoId}` };
       }
 
+      function parseYouTubePlaylistInput(value) {
+        const raw = String(value || "").trim();
+        if (!raw) return null;
+
+        if (PLAYLIST_ID_RE.test(raw)) {
+          return { playlistId: raw, canonicalUrl: `https://www.youtube.com/playlist?list=${raw}` };
+        }
+
+        let candidate = raw;
+        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(candidate)) {
+          if (
+            candidate.startsWith("youtube.com/") ||
+            candidate.startsWith("www.youtube.com/") ||
+            candidate.startsWith("m.youtube.com/")
+          ) {
+            candidate = `https://${candidate}`;
+          } else {
+            return null;
+          }
+        }
+
+        let parsed;
+        try {
+          parsed = new URL(candidate);
+        } catch {
+          return null;
+        }
+        const host = parsed.hostname.toLowerCase();
+        if (!host.endsWith("youtube.com")) return null;
+
+        const playlistId = parsed.searchParams.get("list");
+        if (!playlistId || !PLAYLIST_ID_RE.test(playlistId)) return null;
+        return { playlistId, canonicalUrl: `https://www.youtube.com/playlist?list=${playlistId}` };
+      }
+
       async function fetchPreview(parsedRef) {
         if (!parsedRef) return null;
 
@@ -503,6 +606,7 @@
           dlEl.setAttribute("href", `/download/${data.job_id}`);
           if (card.parentElement === runningList) {
             completedList.prepend(card);
+            completedVisibleCount += 1;
           }
         }
         updateRunningSectionVisibility();
@@ -510,18 +614,26 @@
 
       function filterJobs() {
         if (!runningList || !completedList) return;
-        const cards = [
-          ...runningList.querySelectorAll(".job-item"),
-          ...completedList.querySelectorAll(".job-item"),
-        ];
-        let shown = 0;
-        let completedShown = 0;
-        for (const card of cards) {
+        const runningCards = [...runningList.querySelectorAll(".job-item")];
+        const completedCards = [...completedList.querySelectorAll(".job-item")];
+
+        for (const card of runningCards) {
           card.classList.remove("hidden");
-          shown += 1;
-          if (card.parentElement === completedList) completedShown += 1;
         }
-        if (noCompleted) noCompleted.classList.toggle("hidden", completedShown !== 0);
+
+        let completedShown = 0;
+        for (let i = 0; i < completedCards.length; i += 1) {
+          const show = i < completedVisibleCount;
+          completedCards[i].classList.toggle("hidden", !show);
+          if (show) completedShown += 1;
+        }
+
+        if (showMoreJobsBtn) {
+          showMoreJobsBtn.classList.toggle("hidden", completedCards.length <= completedVisibleCount);
+        }
+        if (noCompleted) noCompleted.classList.toggle("hidden", completedCards.length !== 0);
+
+        const shown = runningCards.length + completedShown;
         if (noJobs) {
           noJobs.classList.toggle("hidden", shown !== 0);
           if (shown === 0) noJobs.textContent = "No jobs found.";
@@ -654,7 +766,32 @@
 
         const parsed = parseYouTubeInput(urlInput.value);
         if (!parsed) {
-          setFormMessage("Error: please provide a valid YouTube URL or 11-character video ID.", true);
+          const playlistParsed = parseYouTubePlaylistInput(urlInput.value);
+          if (playlistParsed) {
+            setFormMessage("Adding playlist...");
+            const playlistResp = await fetch("/playlists/intake", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: playlistParsed.canonicalUrl }),
+            });
+            if (!playlistResp.ok) {
+              const err = await playlistResp.json().catch(() => ({}));
+              setFormMessage(`Error: ${err.detail || "Playlist add failed"}`, true);
+              return;
+            }
+            const payload = await playlistResp.json();
+            if (playlistsLink) {
+              playlistsLink.classList.add("highlight-added");
+              playlistsLink.classList.add("slow-blink");
+              setTimeout(() => {
+                playlistsLink.classList.remove("slow-blink");
+                playlistsLink.classList.remove("highlight-added");
+              }, 8000);
+            }
+            setFormMessage(payload.message || "Playlist updated.");
+            return;
+          }
+          setFormMessage("Error: please provide a valid YouTube video URL/ID or playlist URL/ID.", true);
           return;
         }
         urlInput.value = parsed.canonicalUrl;
@@ -716,6 +853,11 @@
         if (e.key !== "Enter") return;
         e.preventDefault();
         form.requestSubmit();
+      });
+
+      showMoreJobsBtn?.addEventListener("click", () => {
+        completedVisibleCount += COMPLETED_PAGE_STEP;
+        filterJobs();
       });
 
       (function bootstrapFromQuery() {

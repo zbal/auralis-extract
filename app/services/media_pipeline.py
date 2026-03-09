@@ -38,6 +38,12 @@ class MediaMetadata(dict):
         return None
 
 
+class PlaylistMetadata(dict):
+    @property
+    def title(self) -> str:
+        return str(self.get("title") or "Untitled Playlist")
+
+
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -66,6 +72,23 @@ def fetch_video_metadata(url: str) -> MediaMetadata:
     except json.JSONDecodeError as exc:
         raise PipelineError("Unable to parse video metadata", code="metadata_parse_failed") from exc
     return MediaMetadata(raw)
+
+
+def fetch_playlist_metadata(url: str) -> PlaylistMetadata:
+    _ensure_binary("yt-dlp")
+    cmd = [
+        "yt-dlp",
+        "--flat-playlist",
+        "--skip-download",
+        "--dump-single-json",
+        url,
+    ]
+    result = _run(cmd)
+    try:
+        raw = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise PipelineError("Unable to parse playlist metadata", code="playlist_metadata_parse_failed") from exc
+    return PlaylistMetadata(raw)
 
 
 def download_audio_source(

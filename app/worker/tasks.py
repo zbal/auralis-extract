@@ -34,7 +34,9 @@ def process_job(job_id: str, url: str, target_i: int = -16) -> None:
     if raw is None:
         record = JobRecord(job_id=job_id, input_url=url, status=STATUS_RUNNING, created_at=utc_now_iso())
     else:
-        record = JobRecord(**raw)
+        if raw.get("removed") is True:
+            return
+        record = JobRecord.from_dict(raw)
         record.status = STATUS_RUNNING
 
     last_write = 0.0
@@ -62,26 +64,31 @@ def process_job(job_id: str, url: str, target_i: int = -16) -> None:
         if ref is None:
             raise PipelineError("Unable to parse canonical YouTube URL", code="input_parse_failed")
 
-        if not record.media_title or not record.media_artist:
+        if not record.media_title or not record.media_artist or not record.media_thumbnail_url:
             cached = load_cached_metadata(ref.video_id)
             if cached:
                 record.media_title = record.media_title or cached.get("title")
                 record.media_artist = record.media_artist or cached.get("artist")
                 record.media_thumbnail_url = record.media_thumbnail_url or cached.get("thumbnail_url")
 
-        if not record.media_title or not record.media_artist:
-            metadata = fetch_video_metadata(url)
-            record.media_title = metadata.title
-            record.media_artist = metadata.artist
-            record.media_thumbnail_url = metadata.thumbnail_url
-            save_cached_metadata(
-                ref.video_id,
-                {
-                    "title": record.media_title,
-                    "artist": record.media_artist,
-                    "thumbnail_url": record.media_thumbnail_url or "",
-                },
-            )
+        if not record.media_title or not record.media_artist or not record.media_thumbnail_url:
+            try:
+                metadata = fetch_video_metadata(url)
+                record.media_title = metadata.title
+                record.media_artist = metadata.artist
+                record.media_thumbnail_url = metadata.thumbnail_url
+                save_cached_metadata(
+                    ref.video_id,
+                    {
+                        "title": record.media_title,
+                        "artist": record.media_artist,
+                        "thumbnail_url": record.media_thumbnail_url or "",
+                    },
+                )
+            except PipelineError:
+                # Metadata prefetch is best-effort; continue with known/fallback values.
+                record.media_title = record.media_title or "Unknown Title"
+                record.media_artist = record.media_artist or "Unknown Artist"
 
         update("downloading", 2, f"Metadata loaded: {record.media_artist} - {record.media_title}")
 

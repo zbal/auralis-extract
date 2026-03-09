@@ -13,6 +13,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       JOBS_DIR: /data/jobs
+      PLAYLISTS_DIR: /data/playlists
       OUTPUT_DIR: /data/output
       TEMP_DIR: /tmp/auralis-extract
       METADATA_CACHE_DIR: /data/cache/metadata
@@ -26,6 +27,7 @@ services:
       JOB_TIMEOUT_SECONDS: "7200"
     volumes:
       - ./data/jobs:/data/jobs
+      - ./data/playlists:/data/playlists
       - ./data/output:/data/output
       - ./data/cache:/data/cache
     depends_on:
@@ -40,6 +42,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       JOBS_DIR: /data/jobs
+      PLAYLISTS_DIR: /data/playlists
       OUTPUT_DIR: /data/output
       TEMP_DIR: /tmp/auralis-extract
       METADATA_CACHE_DIR: /data/cache/metadata
@@ -53,6 +56,7 @@ services:
       JOB_TIMEOUT_SECONDS: "7200"
     volumes:
       - ./data/jobs:/data/jobs
+      - ./data/playlists:/data/playlists
       - ./data/output:/data/output
       - ./data/cache:/data/cache
     depends_on:
