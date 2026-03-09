@@ -147,12 +147,6 @@
         overflow-wrap: anywhere;
         word-break: break-word;
       }
-      .jobs-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-      }
       .jobs-list {
         margin-top: 10px;
         display: grid;
@@ -268,10 +262,6 @@
       <p id="form-message" class="muted hidden"></p>
 
       <section class="panel">
-        <div class="jobs-head">
-          <h3>Jobs</h3>
-          <span class="muted" id="jobs-count"></span>
-        </div>
         <section id="running-section">
         <h4 class="muted">Running</h4>
         <div id="running-list" class="jobs-list">
@@ -377,7 +367,6 @@
       const runningSection = document.getElementById("running-section");
       const noCompleted = document.getElementById("no-completed");
       const noJobs = document.getElementById("no-jobs");
-      const jobsCount = document.getElementById("jobs-count");
 
       let previewTimer = null;
       let isPollingJobs = false;
@@ -532,7 +521,6 @@
           shown += 1;
           if (card.parentElement === completedList) completedShown += 1;
         }
-        if (jobsCount) jobsCount.textContent = `${shown} shown`;
         if (noCompleted) noCompleted.classList.toggle("hidden", completedShown !== 0);
         if (noJobs) {
           noJobs.classList.toggle("hidden", shown !== 0);
