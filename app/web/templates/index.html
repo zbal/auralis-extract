@@ -34,6 +34,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
+        margin-bottom: 16px;
       }
       .brand-logo {
         width: 44px;
@@ -46,9 +47,21 @@
         margin: 0;
         line-height: 1;
       }
+      .brand-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
       .tagline {
         color: var(--muted);
-        margin: 8px 0 0;
+        margin: 0;
+      }
+      .tagline a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .tagline a:hover {
+        text-decoration: underline;
       }
       input {
         width: 100%;
@@ -68,6 +81,18 @@
         cursor: pointer;
       }
       button:hover { background: var(--accent-hover); }
+      .url-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .url-row input {
+        flex: 1;
+      }
+      .convert-btn {
+        margin-top: 0;
+        white-space: nowrap;
+      }
       .panel {
         margin-top: 18px;
         border: 1px solid #ede7de;
@@ -92,19 +117,6 @@
         width: 0%;
         background: linear-gradient(90deg, #0f766e, #14b8a6);
         transition: width 300ms ease;
-      }
-      .preview-card {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        min-width: 0;
-      }
-      .thumb {
-        width: 160px;
-        aspect-ratio: 16 / 9;
-        object-fit: cover;
-        border-radius: 10px;
-        background: #e8e8e8;
       }
       .mini-list {
         margin-top: 10px;
@@ -140,9 +152,6 @@
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-      }
-      .jobs-search {
-        margin-top: 10px;
       }
       .jobs-list {
         margin-top: 10px;
@@ -241,28 +250,30 @@
     <main class="wrap">
       <div class="brand">
         <img class="brand-logo" src="/static/logo.png" alt="Auralis Extract logo" />
-        <h1 class="brand-title">Auralis Extract</h1>
+        <div class="brand-copy">
+          <h1 class="brand-title">Auralis Extract</h1>
+          <p class="tagline">
+            Your own MP3 extractor: no ads, no noise.
+            <a href="{{ github_url }}" target="_blank" rel="noreferrer">Get the code</a>.
+          </p>
+        </div>
       </div>
-      <p class="tagline">Single URL conversion, MP3 128k CBR, -14 LUFS normalization.</p>
 
       <form id="job-form">
-        <label for="url">Video URL</label>
-        <input id="url" name="url" type="url" required placeholder="https://website.com/watch?v=..." />
-        <button type="submit">Convert</button>
+        <div class="url-row">
+          <input id="url" name="url" type="url" required placeholder="https://website.com/watch?v=..." />
+          <button type="submit" class="convert-btn">Extract</button>
+        </div>
       </form>
       <p id="form-message" class="muted hidden"></p>
-
-      <section id="preview-panel" class="panel hidden"></section>
 
       <section class="panel">
         <div class="jobs-head">
           <h3>Jobs</h3>
           <span class="muted" id="jobs-count"></span>
         </div>
-        <input id="jobs-search" class="jobs-search" type="text" placeholder="Search jobs by title, author, URL, status" />
-
+        <section id="running-section">
         <h4 class="muted">Running</h4>
-        <p id="no-running" class="muted hidden">No running jobs.</p>
         <div id="running-list" class="jobs-list">
           {% for item in job_items if item.status in ['queued', 'running'] %}
           <article
@@ -303,6 +314,7 @@
           </article>
           {% endfor %}
         </div>
+        </section>
 
         <h4 class="muted">Completed</h4>
         <p id="no-completed" class="muted hidden">No completed jobs.</p>
@@ -360,20 +372,26 @@
       const form = document.getElementById("job-form");
       const urlInput = document.getElementById("url");
       const formMessage = document.getElementById("form-message");
-      const previewPanel = document.getElementById("preview-panel");
-      const jobsSearch = document.getElementById("jobs-search");
       const runningList = document.getElementById("running-list");
       const completedList = document.getElementById("completed-list");
-      const noRunning = document.getElementById("no-running");
+      const runningSection = document.getElementById("running-section");
       const noCompleted = document.getElementById("no-completed");
       const noJobs = document.getElementById("no-jobs");
       const jobsCount = document.getElementById("jobs-count");
 
       let previewTimer = null;
-      let lastPreviewVideoId = "";
-      let lastPreview = null;
       let isPollingJobs = false;
+      const previewByVideoId = new Map();
+      const previewInflightByVideoId = new Map();
       const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+      function updateRunningSectionVisibility() {
+        if (!runningSection || !runningList) return;
+        const hasActive = Boolean(
+          runningList.querySelector('.job-item[data-status="queued"], .job-item[data-status="running"]')
+        );
+        runningSection.classList.toggle("hidden", !hasActive);
+      }
 
       function setFormMessage(text, isError = false) {
         if (!formMessage) return;
@@ -439,41 +457,35 @@
         return { videoId, canonicalUrl: `https://www.youtube.com/watch?v=${videoId}` };
       }
 
-      function renderPreview(data) {
-        const thumb = data.thumbnail_url
-          ? `<img class="thumb" src="${escapeHtml(data.thumbnail_url)}" alt="Thumbnail"/>`
-          : `<div class="thumb"></div>`;
-        previewPanel.innerHTML = `
-          <h3>Detected Media</h3>
-          <div class="preview-card">
-            ${thumb}
-            <div>
-              <div class="text-wrap"><strong>${escapeHtml(data.title || "Unknown Title")}</strong></div>
-              <div class="muted text-wrap">Artist: ${escapeHtml(data.artist || "Unknown Artist")}</div>
-            </div>
-          </div>
-        `;
-        previewPanel.classList.remove("hidden");
-      }
-
       async function fetchPreview(parsedRef) {
-        if (!parsedRef || parsedRef.videoId === lastPreviewVideoId) return;
-        lastPreviewVideoId = parsedRef.videoId;
-        previewPanel.classList.remove("hidden");
-        previewPanel.innerHTML = `<span class="muted">Loading metadata preview...</span>`;
+        if (!parsedRef) return null;
 
-        const resp = await fetch(`/preview?url=${encodeURIComponent(parsedRef.canonicalUrl)}`);
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          previewPanel.innerHTML = `<span class="muted">Preview unavailable: ${escapeHtml(err.detail || "Unknown error")}</span>`;
-          lastPreview = null;
-          return;
+        const cached = previewByVideoId.get(parsedRef.videoId);
+        if (cached) {
+          return cached;
         }
 
-        const data = await resp.json();
-        lastPreview = data;
-        urlInput.value = data.url || parsedRef.canonicalUrl;
-        renderPreview(data);
+        const inflight = previewInflightByVideoId.get(parsedRef.videoId);
+        if (inflight) {
+          return inflight;
+        }
+        const request = (async () => {
+          const resp = await fetch(`/preview?url=${encodeURIComponent(parsedRef.canonicalUrl)}`);
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || "Unknown error");
+          }
+          return resp.json();
+        })();
+
+        previewInflightByVideoId.set(parsedRef.videoId, request);
+        try {
+          const data = await request;
+          previewByVideoId.set(parsedRef.videoId, data);
+          return data;
+        } finally {
+          previewInflightByVideoId.delete(parsedRef.videoId);
+        }
       }
 
       function updateJobCard(card, data) {
@@ -504,35 +516,29 @@
             completedList.prepend(card);
           }
         }
+        updateRunningSectionVisibility();
       }
 
       function filterJobs() {
         if (!runningList || !completedList) return;
-        const q = (jobsSearch.value || "").trim().toLowerCase();
         const cards = [
           ...runningList.querySelectorAll(".job-item"),
           ...completedList.querySelectorAll(".job-item"),
         ];
         let shown = 0;
-        let runningShown = 0;
         let completedShown = 0;
         for (const card of cards) {
-          const hay = card.dataset.search || "";
-          const show = !q || hay.includes(q);
-          card.classList.toggle("hidden", !show);
-          if (show) {
-            shown += 1;
-            if (card.parentElement === runningList) runningShown += 1;
-            if (card.parentElement === completedList) completedShown += 1;
-          }
+          card.classList.remove("hidden");
+          shown += 1;
+          if (card.parentElement === completedList) completedShown += 1;
         }
         if (jobsCount) jobsCount.textContent = `${shown} shown`;
-        if (noRunning) noRunning.classList.toggle("hidden", runningShown !== 0);
         if (noCompleted) noCompleted.classList.toggle("hidden", completedShown !== 0);
         if (noJobs) {
           noJobs.classList.toggle("hidden", shown !== 0);
           if (shown === 0) noJobs.textContent = "No jobs found.";
         }
+        updateRunningSectionVisibility();
       }
 
       async function removeJob(jobId, card) {
@@ -560,15 +566,31 @@
         });
       }
 
-      function buildJobCard(job) {
-        const title = escapeHtml(job.media_title || (lastPreview && lastPreview.title) || "Unknown Title");
-        const artist = escapeHtml(job.media_artist || (lastPreview && lastPreview.artist) || "Unknown Artist");
+      function applyPreviewToJobCard(card, preview) {
+        if (!card || !preview || !card.isConnected) return;
+        const titleEl = card.querySelector(".text-wrap strong");
+        const artistEl = card.querySelector(".text-wrap .muted");
+        const thumbEl = card.querySelector(".mini-thumb");
+        const sourceUrl = card.getAttribute("data-source-url") || "";
+
+        if (titleEl) titleEl.textContent = preview.title || "Unknown Title";
+        if (artistEl) artistEl.textContent = `Author: ${preview.artist || "Unknown Artist"}`;
+        if (thumbEl && preview.thumbnail_url) {
+          thumbEl.outerHTML = `<img class="mini-thumb" src="${escapeHtml(preview.thumbnail_url)}" alt="thumbnail" />`;
+        }
+
+        card.dataset.search = `${(preview.title || "")} ${(preview.artist || "")} ${sourceUrl} ${(card.dataset.status || "")}`.toLowerCase();
+      }
+
+      function buildJobCard(job, preview = null) {
+        const title = escapeHtml(job.media_title || (preview && preview.title) || "Unknown Title");
+        const artist = escapeHtml(job.media_artist || (preview && preview.artist) || "Unknown Artist");
         const sourceUrl = escapeHtml(job.input_url || "");
         const status = escapeHtml(job.status || "queued");
         const stage = escapeHtml(job.stage || "queued");
         const progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
         const message = escapeHtml(job.message || "Queued");
-        const thumbUrl = job.media_thumbnail_url || (lastPreview && lastPreview.thumbnail_url) || "";
+        const thumbUrl = job.media_thumbnail_url || (preview && preview.thumbnail_url) || "";
         const thumb = thumbUrl
           ? `<img class="mini-thumb" src="${escapeHtml(thumbUrl)}" alt="thumbnail" />`
           : `<div class="mini-thumb"></div>`;
@@ -577,6 +599,7 @@
         article.className = "job-item";
         article.dataset.jobId = job.job_id;
         article.dataset.status = job.status || "queued";
+        article.setAttribute("data-source-url", job.input_url || "");
         article.dataset.search = `${title} ${artist} ${sourceUrl} ${status}`.toLowerCase();
         article.innerHTML = `
           <div class="job-left">
@@ -661,6 +684,7 @@
         }
 
         const data = await resp.json();
+        const cachedPreview = previewByVideoId.get(parsed.videoId) || null;
         const newCard = buildJobCard({
           job_id: data.job_id,
           input_url: parsed.canonicalUrl,
@@ -668,14 +692,25 @@
           stage: "queued",
           progress: 0,
           message: "Queued",
-          media_title: (lastPreview && lastPreview.title) || data.media_title,
-          media_artist: (lastPreview && lastPreview.artist) || data.media_artist,
-          media_thumbnail_url: (lastPreview && lastPreview.thumbnail_url) || data.media_thumbnail_url,
-        });
+          media_title: data.media_title,
+          media_artist: data.media_artist,
+          media_thumbnail_url: data.media_thumbnail_url,
+        }, cachedPreview);
         runningList.prepend(newCard);
         filterJobs();
         pollActiveJobs();
-        setFormMessage(`Queued job: ${data.job_id}`);
+        setFormMessage("");
+
+        if (!cachedPreview) {
+          fetchPreview(parsed)
+            .then((preview) => {
+              applyPreviewToJobCard(newCard, preview);
+              filterJobs();
+            })
+            .catch(() => {
+              // keep fallback text
+            });
+        }
       });
 
       urlInput.addEventListener("input", () => {
@@ -683,19 +718,17 @@
         previewTimer = setTimeout(() => {
           const parsed = parseYouTubeInput(urlInput.value);
           if (!parsed) {
-            lastPreviewVideoId = "";
-            lastPreview = null;
-            previewPanel.classList.add("hidden");
             return;
           }
-          fetchPreview(parsed).catch((err) => {
-            previewPanel.classList.remove("hidden");
-            previewPanel.innerHTML = `<span class="muted">Preview error: ${escapeHtml(err.message || "Unknown error")}</span>`;
-          });
+          fetchPreview(parsed).catch(() => {});
         }, 1200);
       });
 
-      jobsSearch?.addEventListener("input", filterJobs);
+      urlInput.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        form.requestSubmit();
+      });
 
       (function bootstrapFromQuery() {
         bindRemoveButtons();
@@ -715,7 +748,7 @@
                 urlInput.value = job.input_url;
                 const parsed = parseYouTubeInput(job.input_url);
                 if (parsed) {
-                  fetchPreview(parsed);
+                  fetchPreview(parsed).catch(() => {});
                 }
               }
               setFormMessage(`Tracking job: ${jobId}`);
@@ -729,7 +762,7 @@
         urlInput.value = url;
         const parsed = parseYouTubeInput(url);
         if (!parsed) return;
-        fetchPreview(parsed).finally(() => {
+        fetchPreview(parsed).catch(() => {}).finally(() => {
           if (auto) {
             form.requestSubmit();
           }
