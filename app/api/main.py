@@ -70,6 +70,25 @@ def _build_download_view(record: dict) -> dict:
     }
 
 
+def _collect_existing_queue_targets(records: list[dict]) -> tuple[set[str], set[str]]:
+    existing_video_ids: set[str] = set()
+    existing_urls: set[str] = set()
+    for record in records:
+        if record.get("status") not in {"queued", "running", "completed"}:
+            continue
+        raw_video_id = str(record.get("source_video_id") or "").strip()
+        if raw_video_id:
+            existing_video_ids.add(raw_video_id)
+        input_url = str(record.get("input_url") or "").strip()
+        if input_url:
+            existing_urls.add(input_url)
+        ref = parse_youtube_ref(input_url)
+        if ref:
+            existing_video_ids.add(ref.video_id)
+            existing_urls.add(ref.canonical_url)
+    return existing_video_ids, existing_urls
+
+
 def _sync_playlist_record(playlist: dict) -> tuple[bool, str]:
     source_url = str(playlist.get("source_url") or "").strip()
     if not source_url:
@@ -86,8 +105,17 @@ def _sync_playlist_record(playlist: dict) -> tuple[bool, str]:
         save_playlist(playlist)
         return (False, str(exc))
 
+    previous_revision = int(playlist.get("sync_revision") or 0)
+    next_revision = previous_revision + 1
+    had_prior_snapshot = bool(playlist.get("last_sync_at")) or bool(playlist.get("streams"))
     playlist["title"] = payload.get("title") or playlist.get("title") or "Untitled Playlist"
-    playlist["streams"] = _extract_playlist_streams(payload)
+    playlist["streams"] = _extract_playlist_streams(
+        payload,
+        existing_playlist=playlist,
+        current_sync_revision=next_revision,
+        treat_existing_items_as_old=had_prior_snapshot,
+    )
+    playlist["sync_revision"] = next_revision
     playlist["last_sync_at"] = utc_now_iso()
     playlist["updated_at"] = utc_now_iso()
     playlist["last_sync_error"] = ""
@@ -131,10 +159,24 @@ def _enqueue_job_for_url(
     return record.to_dict()
 
 
-def _extract_playlist_streams(playlist_payload: dict) -> list[dict]:
+def _extract_playlist_streams(
+    playlist_payload: dict,
+    existing_playlist: dict | None = None,
+    current_sync_revision: int = 0,
+    treat_existing_items_as_old: bool = False,
+) -> list[dict]:
     entries = playlist_payload.get("entries")
     if not isinstance(entries, list):
         return []
+
+    existing_streams_by_id: dict[str, dict] = {}
+    if isinstance(existing_playlist, dict):
+        for stream in existing_playlist.get("streams") or []:
+            if not isinstance(stream, dict):
+                continue
+            video_id = str(stream.get("video_id") or "").strip()
+            if video_id:
+                existing_streams_by_id[video_id] = stream
 
     streams: list[dict] = []
     for item in entries:
@@ -148,6 +190,13 @@ def _extract_playlist_streams(playlist_payload: dict) -> list[dict]:
         if not video_id:
             continue
         url = f"https://www.youtube.com/watch?v={video_id}"
+        existing = existing_streams_by_id.get(video_id) or {}
+        if existing.get("discovered_sync_revision") is not None:
+            discovered_sync_revision = int(existing.get("discovered_sync_revision") or 0)
+        elif existing and treat_existing_items_as_old:
+            discovered_sync_revision = 0
+        else:
+            discovered_sync_revision = current_sync_revision
         streams.append(
             {
                 "video_id": video_id,
@@ -160,6 +209,10 @@ def _extract_playlist_streams(playlist_payload: dict) -> list[dict]:
                 "availability_status": status,
                 "availability_reason": reason,
                 "availability_last_checked_at": utc_now_iso(),
+                "discovered_sync_revision": discovered_sync_revision,
+                "last_seen_sync_revision": current_sync_revision,
+                "last_job_id": existing.get("last_job_id") or "",
+                "last_queue_at": existing.get("last_queue_at") or "",
             }
         )
     return streams
@@ -217,29 +270,16 @@ def _refresh_stream_eligibility(stream: dict) -> None:
         stream["availability_reason"] = "invalid_stream_reference"
         return
 
-    try:
-        metadata = fetch_video_metadata(canonical_url)
-        stream["title"] = metadata.title or stream.get("title") or "Unknown Title"
-        stream["artist"] = metadata.artist or stream.get("artist") or "Unknown Artist"
-        stream["thumbnail_url"] = metadata.thumbnail_url or stream.get("thumbnail_url") or ""
-        save_cached_metadata(
-            video_id,
-            {
-                "title": stream["title"],
-                "artist": stream["artist"],
-                "thumbnail_url": stream["thumbnail_url"],
-            },
-        )
-        stream["availability_status"] = "available"
-        stream["availability_reason"] = ""
-    except PipelineError as exc:
-        checked_status, checked_reason = _classify_playlist_stream_state(
-            title=str(stream.get("title") or ""),
-            availability=str(stream.get("availability") or ""),
-            error_text=str(exc),
-        )
-        stream["availability_status"] = checked_status
-        stream["availability_reason"] = checked_reason
+    cached = load_cached_metadata(video_id) or {}
+    if cached:
+        stream["title"] = cached.get("title") or stream.get("title") or "Unknown Title"
+        stream["artist"] = cached.get("artist") or stream.get("artist") or "Unknown Artist"
+        stream["thumbnail_url"] = cached.get("thumbnail_url") or stream.get("thumbnail_url") or ""
+
+    # Avoid additional per-stream upstream lookups during playlist selection/queueing.
+    # The worker will fetch metadata during the actual download job if needed.
+    stream["availability_status"] = "available"
+    stream["availability_reason"] = ""
 
 
 def _parse_iso_for_sort(value: str | None) -> datetime:
@@ -262,48 +302,208 @@ def _format_human_day_time(value: str | None) -> str:
     return parsed.astimezone(timezone.utc).strftime("%d %b %H:%M UTC")
 
 
-def _build_playlist_views(playlists: list[dict], records: list[dict]) -> list[dict]:
-    job_by_url: dict[str, dict] = {}
-    for record in records:
-        if record.get("status") != "completed":
-            continue
-        input_url = str(record.get("input_url") or "").strip()
-        if not input_url:
-            continue
-        existing = job_by_url.get(input_url)
-        if existing is None:
-            job_by_url[input_url] = record
-            continue
-        if _parse_iso_for_sort(record.get("finished_at") or record.get("created_at")) > _parse_iso_for_sort(
-            existing.get("finished_at") or existing.get("created_at")
+def _stream_state_label(state: str) -> str:
+    labels = {
+        "downloaded": "Downloaded",
+        "queued": "Queued",
+        "failed": "Failed",
+        "new": "New",
+        "unavailable": "Unavailable",
+    }
+    return labels.get(state, state.replace("_", " ").title())
+
+
+def _build_job_lookup(records: list[dict]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict], dict[str, dict]]:
+    completed_by_url: dict[str, dict] = {}
+    active_by_url: dict[str, dict] = {}
+    failed_by_url: dict[str, dict] = {}
+    latest_by_video_id: dict[str, dict] = {}
+
+    def _remember(target: dict[str, dict], key: str, record: dict, timestamp: str) -> None:
+        if not key:
+            return
+        existing = target.get(key)
+        if existing is None or _parse_iso_for_sort(timestamp) > _parse_iso_for_sort(
+            existing.get("finished_at") or existing.get("started_at") or existing.get("created_at")
         ):
-            job_by_url[input_url] = record
+            target[key] = record
+
+    for record in records:
+        input_url = str(record.get("input_url") or "").strip()
+        video_id = str(record.get("source_video_id") or "").strip()
+        status = str(record.get("status") or "").strip()
+        timestamp = (
+            record.get("finished_at")
+            or record.get("started_at")
+            or record.get("created_at")
+            or ""
+        )
+
+        if status == "completed":
+            _remember(completed_by_url, input_url, record, timestamp)
+        elif status in {"queued", "running"}:
+            _remember(active_by_url, input_url, record, timestamp)
+        elif status == "failed":
+            _remember(failed_by_url, input_url, record, timestamp)
+
+        _remember(latest_by_video_id, video_id, record, timestamp)
+        if not video_id and input_url:
+            ref = parse_youtube_ref(input_url)
+            if ref:
+                _remember(latest_by_video_id, ref.video_id, record, timestamp)
+
+    return completed_by_url, active_by_url, failed_by_url, latest_by_video_id
+
+
+def _derive_stream_view(
+    stream: dict,
+    playlist_sync_revision: int,
+    completed_by_url: dict[str, dict],
+    active_by_url: dict[str, dict],
+    failed_by_url: dict[str, dict],
+    latest_by_video_id: dict[str, dict],
+) -> dict:
+    stream_url = str(stream.get("url") or "").strip()
+    video_id = str(stream.get("video_id") or "").strip()
+    completed_job = completed_by_url.get(stream_url)
+    active_job = active_by_url.get(stream_url)
+    failed_job = failed_by_url.get(stream_url)
+    latest_job = latest_by_video_id.get(video_id) or {}
+    availability_status = str(stream.get("availability_status") or "available").strip()
+    discovered_sync_revision = int(stream.get("discovered_sync_revision") or 0)
+    is_new = discovered_sync_revision == playlist_sync_revision
+
+    state = "undownloaded"
+    badge_tone = "muted"
+    helper_text = ""
+    selectable = True
+    download_url = ""
+
+    if completed_job:
+        state = "downloaded"
+        badge_tone = "success"
+        selectable = False
+        download_url = f"/download/{completed_job.get('job_id')}"
+    elif active_job:
+        state = "queued"
+        badge_tone = "info"
+        helper_text = "Already queued"
+        selectable = False
+    elif failed_job:
+        state = "failed"
+        badge_tone = "danger"
+        helper_text = str(failed_job.get("message") or "Last attempt failed")
+    elif availability_status != "available":
+        state = "unavailable"
+        helper_text = str(stream.get("availability_reason") or "Unavailable").replace("_", " ")
+        selectable = False
+    elif is_new:
+        state = "new"
+        badge_tone = "new"
+
+    return {
+        "video_id": video_id,
+        "url": stream_url,
+        "title": str(stream.get("title") or latest_job.get("media_title") or "Unknown Title"),
+        "artist": str(stream.get("artist") or latest_job.get("media_artist") or "Unknown Artist"),
+        "thumbnail_url": str(stream.get("thumbnail_url") or latest_job.get("media_thumbnail_url") or ""),
+        "position": stream.get("position"),
+        "state": state,
+        "state_label": _stream_state_label(state),
+        "badge_tone": badge_tone,
+        "helper_text": helper_text,
+        "is_new": is_new,
+        "selectable": selectable,
+        "download_url": download_url,
+    }
+
+
+def _queue_streams_from_playlist(
+    playlist: dict,
+    requested_ids: set[str],
+) -> tuple[int, list[dict]]:
+    streams = playlist.get("streams")
+    if not isinstance(streams, list):
+        streams = []
+
+    existing_records = list_jobs(include_removed=False)
+    existing_video_ids, existing_urls = _collect_existing_queue_targets(existing_records)
+
+    enqueued = 0
+    queued_streams: list[dict] = []
+    for stream in streams:
+        if not isinstance(stream, dict):
+            continue
+        video_id = str(stream.get("video_id") or "").strip()
+        canonical_url = str(stream.get("url") or "").strip()
+        if video_id not in requested_ids or not canonical_url:
+            continue
+
+        _refresh_stream_eligibility(stream)
+        if str(stream.get("availability_status") or "") != "available":
+            continue
+        if video_id in existing_video_ids or canonical_url in existing_urls:
+            continue
+
+        job = _enqueue_job_for_url(
+            canonical_url=canonical_url,
+            video_id=video_id,
+            media_title=str(stream.get("title") or "Unknown Title"),
+            media_artist=str(stream.get("artist") or "Unknown Artist"),
+            media_thumbnail_url=str(stream.get("thumbnail_url") or ""),
+        )
+        stream["last_job_id"] = job.get("job_id") or ""
+        stream["last_queue_at"] = utc_now_iso()
+        existing_video_ids.add(video_id)
+        existing_urls.add(canonical_url)
+        enqueued += 1
+        queued_streams.append(stream)
+
+    playlist["updated_at"] = utc_now_iso()
+    save_playlist(playlist)
+    return enqueued, queued_streams
+
+
+def _build_playlist_views(playlists: list[dict], records: list[dict]) -> list[dict]:
+    completed_by_url, active_by_url, failed_by_url, latest_by_video_id = _build_job_lookup(records)
 
     views: list[dict] = []
     for playlist in playlists:
         streams = playlist.get("streams")
         if not isinstance(streams, list):
             streams = []
+        playlist_sync_revision = int(playlist.get("sync_revision") or 0)
         total_streams = len(streams)
-        fetched_streams = 0
-        downloaded_items: list[dict] = []
+        downloaded_count = 0
+        new_count = 0
+        queued_count = 0
+        failed_count = 0
+        stream_items: list[dict] = []
 
         for stream in streams:
             if not isinstance(stream, dict):
                 continue
-            stream_url = str(stream.get("url") or "").strip()
-            completed_job = job_by_url.get(stream_url)
-            if not completed_job:
-                continue
-            fetched_streams += 1
-            downloaded_items.append(
-                {
-                    "title": completed_job.get("media_title") or stream.get("title") or "Unknown Title",
-                    "artist": completed_job.get("media_artist") or stream.get("artist") or "Unknown Artist",
-                    "thumbnail_url": completed_job.get("media_thumbnail_url") or stream.get("thumbnail_url") or "",
-                    "download_url": f"/download/{completed_job.get('job_id')}",
-                }
+            stream_view = _derive_stream_view(
+                stream,
+                playlist_sync_revision=playlist_sync_revision,
+                completed_by_url=completed_by_url,
+                active_by_url=active_by_url,
+                failed_by_url=failed_by_url,
+                latest_by_video_id=latest_by_video_id,
             )
+            stream_items.append(stream_view)
+
+            if stream_view["state"] == "downloaded":
+                downloaded_count += 1
+            elif stream_view["state"] == "queued":
+                queued_count += 1
+            elif stream_view["state"] == "failed":
+                failed_count += 1
+
+            if stream_view["is_new"]:
+                new_count += 1
+
+        stream_items.sort(key=lambda item: (item.get("position") is None, item.get("position") or 0))
 
         views.append(
             {
@@ -313,8 +513,11 @@ def _build_playlist_views(playlists: list[dict], records: list[dict]) -> list[di
                 "last_sync_at": playlist.get("last_sync_at") or "",
                 "last_sync_label": _format_human_day_time(playlist.get("last_sync_at")),
                 "total_streams": total_streams,
-                "fetched_streams": fetched_streams,
-                "downloaded_items": downloaded_items,
+                "downloaded_count": downloaded_count,
+                "new_count": new_count,
+                "queued_count": queued_count,
+                "failed_count": failed_count,
+                "stream_items": stream_items,
             }
         )
 
@@ -401,7 +604,13 @@ def index(request: Request):
 
 
 @app.get("/playlists", response_class=HTMLResponse)
-def playlists_page(request: Request, notice: str = Query("")):
+def playlists_page(
+    request: Request,
+    notice: str = Query(""),
+    new_count: int = Query(0),
+    queued_count: int = Query(0),
+    auto_select_new: int = Query(0),
+):
     playlists = list_playlists()
     records = list_jobs(include_removed=False)
     playlist_items = _build_playlist_views(playlists, records)
@@ -411,6 +620,9 @@ def playlists_page(request: Request, notice: str = Query("")):
             **_base_context(request),
             "playlist_items": playlist_items,
             "notice": notice,
+            "new_count": new_count,
+            "queued_count": queued_count,
+            "auto_select_new": auto_select_new == 1,
         },
     )
 
@@ -510,7 +722,17 @@ def sync_playlist(playlist_id: str):
     synced, error = _sync_playlist_record(playlist)
     if not synced:
         raise HTTPException(status_code=400, detail=error)
-    return RedirectResponse(url="/playlists?notice=synced", status_code=303)
+    new_count = 0
+    for stream in playlist.get("streams") or []:
+        if not isinstance(stream, dict):
+            continue
+        if int(stream.get("discovered_sync_revision") or 0) == int(playlist.get("sync_revision") or 0):
+            new_count += 1
+    auto_select_new = 1 if new_count > 0 else 0
+    return RedirectResponse(
+        url=f"/playlists?notice=synced&new_count={new_count}&auto_select_new={auto_select_new}",
+        status_code=303,
+    )
 
 
 @app.post("/playlists/{playlist_id}/fetch-all")
@@ -526,23 +748,16 @@ def fetch_playlist_all(playlist_id: str, mode: str = Form("all")):
     selected_streams = streams
     if mode == "newest10":
         selected_streams = streams[:10]
+    elif mode == "new":
+        current_revision = int(playlist.get("sync_revision") or 0)
+        selected_streams = [
+            stream
+            for stream in streams
+            if isinstance(stream, dict) and int(stream.get("discovered_sync_revision") or 0) == current_revision
+        ]
 
     existing_records = list_jobs(include_removed=False)
-    existing_video_ids: set[str] = set()
-    existing_urls: set[str] = set()
-    for record in existing_records:
-        if record.get("status") not in {"queued", "running", "completed"}:
-            continue
-        raw_video_id = str(record.get("source_video_id") or "").strip()
-        if raw_video_id:
-            existing_video_ids.add(raw_video_id)
-        input_url = str(record.get("input_url") or "").strip()
-        if input_url:
-            existing_urls.add(input_url)
-        ref = parse_youtube_ref(input_url)
-        if ref:
-            existing_video_ids.add(ref.video_id)
-            existing_urls.add(ref.canonical_url)
+    existing_video_ids, existing_urls = _collect_existing_queue_targets(existing_records)
 
     enqueued = 0
     skipped_unavailable = 0
@@ -567,6 +782,7 @@ def fetch_playlist_all(playlist_id: str, mode: str = Form("all")):
             media_artist=str(stream.get("artist") or "Unknown Artist"),
             media_thumbnail_url=str(stream.get("thumbnail_url") or ""),
         )
+        stream["last_queue_at"] = utc_now_iso()
         existing_video_ids.add(video_id)
         existing_urls.add(canonical_url)
         enqueued += 1
@@ -576,7 +792,52 @@ def fetch_playlist_all(playlist_id: str, mode: str = Form("all")):
     playlist["last_fetch_skipped_unavailable_count"] = skipped_unavailable
     playlist["last_fetch_mode"] = mode
     save_playlist(playlist)
-    return RedirectResponse(url="/playlists", status_code=303)
+    return RedirectResponse(url=f"/playlists?notice=queued&queued_count={enqueued}", status_code=303)
+
+
+@app.post("/playlists/{playlist_id}/queue-selected")
+def queue_selected_playlist_streams(playlist_id: str, stream_ids: list[str] = Form(default=[])):
+    playlist = load_playlist(playlist_id)
+    if playlist is None or playlist.get("removed") is True:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    requested_ids = {str(stream_id or "").strip() for stream_id in stream_ids if str(stream_id or "").strip()}
+    if not requested_ids:
+        return RedirectResponse(url="/playlists?notice=no_selection", status_code=303)
+
+    enqueued, _ = _queue_streams_from_playlist(playlist, requested_ids)
+    return RedirectResponse(url=f"/playlists?notice=queued&queued_count={enqueued}", status_code=303)
+
+
+@app.post("/api/playlists/{playlist_id}/queue-stream")
+def queue_single_playlist_stream_api(playlist_id: str, stream_id: str = Form(...)):
+    playlist = load_playlist(playlist_id)
+    if playlist is None or playlist.get("removed") is True:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    stream_id = str(stream_id or "").strip()
+    if not stream_id:
+        raise HTTPException(status_code=400, detail="stream_id is required")
+
+    enqueued, queued_streams = _queue_streams_from_playlist(playlist, {stream_id})
+    if enqueued == 0:
+        raise HTTPException(status_code=409, detail="Stream already queued, downloaded, unavailable, or missing")
+
+    records = list_jobs(include_removed=False)
+    completed_by_url, active_by_url, failed_by_url, latest_by_video_id = _build_job_lookup(records)
+    stream_view = _derive_stream_view(
+        queued_streams[0],
+        playlist_sync_revision=int(playlist.get("sync_revision") or 0),
+        completed_by_url=completed_by_url,
+        active_by_url=active_by_url,
+        failed_by_url=failed_by_url,
+        latest_by_video_id=latest_by_video_id,
+    )
+    return {
+        "ok": True,
+        "message": f"Queued {stream_view['title']}.",
+        "stream": stream_view,
+    }
 
 
 @app.post("/playlists/{playlist_id}/delete")

@@ -13,6 +13,16 @@
         --accent: #0f766e;
         --accent-hover: #115e59;
         --muted: #6b7280;
+        --success: #166534;
+        --success-bg: #effcf3;
+        --success-border: #b7ebc5;
+        --warning-bg: #fff7ed;
+        --warning-border: #fed7aa;
+        --danger: #991b1b;
+        --danger-bg: #fef2f2;
+        --danger-border: #fecaca;
+        --info-bg: #eff6ff;
+        --info-border: #bfdbfe;
       }
       * { box-sizing: border-box; }
       body {
@@ -55,6 +65,29 @@
         border-color: #d9e2ec;
         background: #f8fafc;
         color: #475569;
+      }
+      .toast-stack {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        display: grid;
+        gap: 8px;
+        z-index: 50;
+      }
+      .toast {
+        min-width: 220px;
+        max-width: min(360px, calc(100vw - 40px));
+        border-radius: 10px;
+        padding: 10px 12px;
+        border: 1px solid #cfe9e5;
+        background: #f2fbf9;
+        color: #0f766e;
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
+      }
+      .toast.error {
+        border-color: #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
       }
       .add-form {
         margin-top: 14px;
@@ -191,6 +224,88 @@
         gap: 10px;
         width: 100%;
         min-width: 0;
+        overflow: visible;
+        position: relative;
+      }
+      .streams-shell {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        gap: 10px;
+        position: relative;
+      }
+      .batch-bar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #e7dece;
+        border-radius: 10px;
+        background: rgba(255, 252, 246, 0.96);
+        backdrop-filter: blur(6px);
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+      }
+      .batch-actions,
+      .batch-shortcuts {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .batch-shortcuts button {
+        border: 1px solid #ddd7cc;
+        border-radius: 8px;
+        background: #fff;
+        color: #374151;
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+      .stream-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid #ebe4d9;
+        border-radius: 10px;
+        padding: 10px;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        background: #fffdfa;
+      }
+      .stream-row.is-downloaded,
+      .stream-row.is-queued {
+        background: #fffefb;
+      }
+      .stream-row.is-fresh {
+        border-color: var(--success-border);
+        background: linear-gradient(180deg, #f6fff8, var(--success-bg));
+      }
+      .stream-row.is-undownloaded {
+        opacity: 0.72;
+      }
+      .stream-row.is-unavailable {
+        opacity: 0.58;
+        background: #faf7f2;
+      }
+      .stream-select {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        flex: 0 0 26px;
+        min-width: 26px;
+      }
+      .stream-select input {
+        width: 18px;
+        height: 18px;
       }
       .dl-item {
         display: flex;
@@ -204,6 +319,9 @@
       }
       .thumb {
         width: 86px;
+        min-width: 86px;
+        max-width: 86px;
+        flex: 0 0 86px;
         aspect-ratio: 16 / 9;
         object-fit: cover;
         border-radius: 6px;
@@ -214,6 +332,64 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      .stream-meta {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 4px;
+        font-size: 13px;
+      }
+      .stream-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-shrink: 0;
+        min-width: 0;
+      }
+      .stream-actions form {
+        margin: 0;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 12px;
+        border: 1px solid #d6d3cc;
+        background: #f8fafc;
+        color: #475569;
+      }
+      .badge.success {
+        color: var(--success);
+        background: var(--success-bg);
+        border-color: var(--success-border);
+      }
+      .badge.new {
+        color: var(--success);
+        background: #dcfce7;
+        border-color: #86efac;
+      }
+      .badge.info {
+        color: #1d4ed8;
+        background: var(--info-bg);
+        border-color: var(--info-border);
+      }
+      .badge.danger {
+        color: var(--danger);
+        background: var(--danger-bg);
+        border-color: var(--danger-border);
+      }
+      .action-btn[disabled] {
+        background: #cbd5e1;
+        cursor: default;
+      }
+      .action-btn[disabled]:hover {
+        background: #cbd5e1;
+      }
+      .is-hidden {
+        display: none !important;
       }
       .row-main {
         min-width: 0;
@@ -245,10 +421,23 @@
         .actions {
           width: 100%;
         }
+        .batch-bar,
+        .stream-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .stream-select {
+          width: auto;
+          justify-content: flex-start;
+        }
+        .stream-actions {
+          justify-content: flex-end;
+        }
       }
     </style>
   </head>
   <body>
+    <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="true"></div>
     <main class="wrap">
       <div class="topbar">
         <h1 style="margin:0;">Playlists</h1>
@@ -269,13 +458,17 @@
       {% elif notice == "restored" %}
       <div class="notice">Playlist restored. It is active again.</div>
       {% elif notice == "synced" %}
-      <div class="notice">Playlist synced successfully.</div>
+      <div class="notice">Playlist synced successfully{% if new_count %}. {{ new_count }} new stream{% if new_count != 1 %}s{% endif %} highlighted{% endif %}.</div>
       {% elif notice == "sync_failed" %}
       <div class="notice info">Playlist saved, but sync failed. Try Sync again.</div>
       {% elif notice == "updated" %}
       <div class="notice info">Playlist updated and active.</div>
       {% elif notice == "exists" %}
       <div class="notice info">Playlist updated and active.</div>
+      {% elif notice == "queued" %}
+      <div class="notice">Added {{ queued_count }} stream{% if queued_count != 1 %}s{% endif %} to the download queue.</div>
+      {% elif notice == "no_selection" %}
+      <div class="notice info">Select at least one stream before adding to the download queue.</div>
       {% endif %}
 
       <section class="list">
@@ -289,7 +482,7 @@
                   <div class="meta muted">
                     <div>Last sync: {{ item.last_sync_label }}</div>
                     <div>Streams: {{ item.total_streams }}</div>
-                    <div>Fetched: {{ item.fetched_streams }}</div>
+                    <div>Downloaded: {{ item.downloaded_count }} · New: {{ item.new_count }} · Queued: {{ item.queued_count }} · Failed: {{ item.failed_count }}</div>
                   </div>
                 </div>
                 <div class="actions">
@@ -309,6 +502,10 @@
                     </button>
                     <div class="fetch-popover" role="menu" aria-label="Fetch options">
                       <form method="post" action="/playlists/{{ item.playlist_id }}/fetch-all">
+                        <input type="hidden" name="mode" value="new" />
+                        <button class="fetch-option" type="submit">New streams</button>
+                      </form>
+                      <form method="post" action="/playlists/{{ item.playlist_id }}/fetch-all">
                         <input type="hidden" name="mode" value="all" />
                         <button class="fetch-option" type="submit">All</button>
                       </form>
@@ -327,25 +524,83 @@
               </summary>
 
               <div class="downloads">
-                {% if item.downloaded_items %}
-                  {% for dl in item.downloaded_items %}
-                  <div class="dl-item">
-                    {% if dl.thumbnail_url %}
-                    <img class="thumb" src="{{ dl.thumbnail_url }}" alt="thumbnail" />
-                    {% else %}
-                    <div class="thumb"></div>
-                    {% endif %}
-                    <div class="dl-info">
-                      <div class="title"><strong>{{ dl.title }}</strong></div>
-                      <div class="muted">Author: {{ dl.artist }}</div>
+                {% if item.stream_items %}
+                  <div class="streams-shell" data-selection-form data-form-id="playlist-select-{{ item.playlist_id }}">
+                    <form id="playlist-select-{{ item.playlist_id }}" method="post" action="/playlists/{{ item.playlist_id }}/queue-selected"></form>
+                    <div class="batch-bar">
+                      <div class="batch-shortcuts">
+                        <button type="button" data-select-filter="new">Select new</button>
+                        <button type="button" data-select-filter="undownloaded">Select undownloaded</button>
+                        <button type="button" data-select-filter="clear">Clear</button>
+                      </div>
+                      <div class="batch-actions">
+                        <span class="muted" data-selection-count>0 selected</span>
+                        <button class="action-btn" type="submit" form="playlist-select-{{ item.playlist_id }}" data-batch-submit disabled>Add selected to queue</button>
+                      </div>
                     </div>
-                    <a class="icon-btn" href="{{ dl.download_url }}" title="Download" aria-label="Download">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-                    </a>
+
+                    {% for stream in item.stream_items %}
+                    <div class="stream-row is-{{ stream.state }} {% if stream.is_new %}is-fresh{% endif %}" data-stream-row data-state="{{ stream.state }}" data-new="{{ 'true' if stream.is_new else 'false' }}" data-selectable="{{ 'true' if stream.selectable else 'false' }}">
+                      <label class="stream-select">
+                        <input
+                          type="checkbox"
+                          name="stream_ids"
+                          value="{{ stream.video_id }}"
+                          data-stream-checkbox
+                          form="playlist-select-{{ item.playlist_id }}"
+                          {% if auto_select_new and stream.is_new and stream.selectable %}checked{% endif %}
+                          {% if not stream.selectable %}disabled{% endif %}
+                        />
+                      </label>
+                      {% if stream.thumbnail_url %}
+                      <img class="thumb" src="{{ stream.thumbnail_url }}" alt="thumbnail" />
+                      {% else %}
+                      <div class="thumb"></div>
+                      {% endif %}
+                      <div class="dl-info">
+                        <div class="title"><strong>{{ stream.title }}</strong></div>
+                        <div class="muted">Author: {{ stream.artist }}</div>
+                        <div class="stream-meta">
+                          {% if stream.state != "undownloaded" and stream.state != "downloaded" %}
+                          <span class="badge {{ stream.badge_tone }}" data-state-badge>{{ stream.state_label }}</span>
+                          {% endif %}
+                          {% if stream.position is not none %}
+                          <span class="muted" data-position-label>#{{ stream.position }}</span>
+                          {% endif %}
+                          {% if stream.helper_text %}
+                          <span class="muted" data-helper-text>{{ stream.helper_text }}</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                      <div class="stream-actions">
+                        <a class="icon-btn" href="{{ stream.url }}" target="_blank" rel="noreferrer" title="Open source" aria-label="Open source">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>
+                        </a>
+                        {% if stream.selectable %}
+                        <form method="post" action="/api/playlists/{{ item.playlist_id }}/queue-stream" data-inline-queue-form>
+                          <input type="hidden" name="stream_id" value="{{ stream.video_id }}" />
+                          <button class="icon-btn" type="submit" title="Add this stream to queue" aria-label="Add this stream to queue" data-inline-queue-button>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 6h10"/>
+                              <path d="M4 12h10"/>
+                              <path d="M4 18h6"/>
+                              <path d="M18 8v8"/>
+                              <path d="M14 12h8"/>
+                            </svg>
+                          </button>
+                        </form>
+                        {% endif %}
+                        {% if stream.download_url %}
+                        <a class="icon-btn" href="{{ stream.download_url }}" title="Download" aria-label="Download">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                        </a>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% endfor %}
                   </div>
-                  {% endfor %}
                 {% else %}
-                  <div class="muted">No downloaded streams for this playlist yet.</div>
+                  <div class="muted">No streams found for this playlist yet.</div>
                 {% endif %}
               </div>
             </details>
@@ -391,6 +646,147 @@
         if (!target.closest(".fetch-menu")) {
           document.querySelectorAll(".fetch-menu.open").forEach((el) => el.classList.remove("open"));
         }
+      });
+
+      const updateSelectionCount = (form) => {
+        const counter = form.querySelector("[data-selection-count]");
+        const submit = form.querySelector("[data-batch-submit]");
+        if (!counter) return;
+        const selected = form.querySelectorAll("[data-stream-checkbox]:checked").length;
+        counter.textContent = `${selected} selected`;
+        if (submit instanceof HTMLButtonElement) {
+          submit.disabled = selected === 0;
+        }
+      };
+
+      const showToast = (message, isError = false) => {
+        const stack = document.getElementById("toast-stack");
+        if (!stack) return;
+        const toast = document.createElement("div");
+        toast.className = `toast${isError ? " error" : ""}`;
+        toast.textContent = message;
+        stack.appendChild(toast);
+        window.setTimeout(() => {
+          toast.remove();
+        }, 2800);
+      };
+
+      const applyQueuedState = (row, stream) => {
+        if (!(row instanceof HTMLElement)) return;
+        row.dataset.state = "queued";
+        row.dataset.new = "false";
+        row.classList.remove("is-new", "is-fresh", "is-undownloaded");
+        row.classList.add("is-queued");
+
+        const badge = row.querySelector("[data-state-badge]");
+        if (badge instanceof HTMLElement) {
+          badge.textContent = stream.state_label;
+          badge.className = `badge ${stream.badge_tone}`;
+        } else {
+          const meta = row.querySelector(".stream-meta");
+          if (meta instanceof HTMLElement) {
+            const newBadge = document.createElement("span");
+            newBadge.className = `badge ${stream.badge_tone}`;
+            newBadge.dataset.stateBadge = "true";
+            newBadge.textContent = stream.state_label;
+            meta.prepend(newBadge);
+          }
+        }
+
+        let helper = row.querySelector("[data-helper-text]");
+        if (stream.helper_text) {
+          if (!(helper instanceof HTMLElement)) {
+            helper = document.createElement("span");
+            helper.className = "muted";
+            helper.setAttribute("data-helper-text", "");
+            const meta = row.querySelector(".stream-meta");
+            if (meta instanceof HTMLElement) meta.appendChild(helper);
+          }
+          helper.textContent = stream.helper_text;
+        } else if (helper instanceof HTMLElement) {
+          helper.remove();
+        }
+
+        const checkbox = row.querySelector("[data-stream-checkbox]");
+        if (checkbox instanceof HTMLInputElement) {
+          checkbox.checked = false;
+          checkbox.disabled = true;
+        }
+
+        const inlineForm = row.querySelector("[data-inline-queue-form]");
+        if (inlineForm instanceof HTMLElement) {
+          inlineForm.remove();
+        }
+
+        const selectionForm = row.closest("[data-selection-form]");
+        if (selectionForm instanceof HTMLElement) {
+          updateSelectionCount(selectionForm);
+        }
+      };
+
+      document.querySelectorAll("[data-selection-form]").forEach((form) => {
+        updateSelectionCount(form);
+
+        form.addEventListener("change", (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLInputElement)) return;
+          if (!target.matches("[data-stream-checkbox]")) return;
+          updateSelectionCount(form);
+        });
+
+        form.querySelectorAll("[data-select-filter]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const mode = button.getAttribute("data-select-filter");
+            form.querySelectorAll("[data-stream-row]").forEach((row) => {
+              if (!(row instanceof HTMLElement)) return;
+              const checkbox = row.querySelector("[data-stream-checkbox]");
+              if (!(checkbox instanceof HTMLInputElement) || checkbox.disabled) return;
+
+              if (mode === "clear") {
+                checkbox.checked = false;
+              } else if (mode === "new") {
+                checkbox.checked = row.dataset.new === "true";
+              } else if (mode === "undownloaded") {
+                checkbox.checked = ["undownloaded", "new", "failed"].includes(row.dataset.state || "");
+              }
+            });
+            updateSelectionCount(form);
+          });
+        });
+      });
+
+      document.querySelectorAll("[data-inline-queue-form]").forEach((form) => {
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const button = form.querySelector("[data-inline-queue-button]");
+          if (button instanceof HTMLButtonElement) {
+            button.disabled = true;
+          }
+
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              body: new FormData(form),
+              headers: {
+                "X-Requested-With": "fetch",
+              },
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(payload.detail || "Unable to queue stream");
+            }
+
+            const row = form.closest("[data-stream-row]");
+            applyQueuedState(row, payload.stream || {});
+            showToast(payload.message || "Stream queued.");
+          } catch (error) {
+            if (button instanceof HTMLButtonElement) {
+              button.disabled = false;
+            }
+            showToast(error instanceof Error ? error.message : "Unable to queue stream", true);
+          }
+        });
       });
     </script>
   </body>
