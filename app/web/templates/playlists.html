@@ -259,6 +259,11 @@
         align-items: center;
         flex-wrap: wrap;
       }
+      .batch-controls {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+      }
       .batch-shortcuts button {
         border: 1px solid #ddd7cc;
         border-radius: 8px;
@@ -266,6 +271,26 @@
         color: #374151;
         padding: 8px 10px;
         cursor: pointer;
+      }
+      .filter-bar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .filter-chip {
+        border: 1px solid #ddd7cc;
+        border-radius: 999px;
+        background: #fff;
+        color: #475569;
+        padding: 6px 10px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .filter-chip.is-active {
+        background: #e6fffa;
+        color: #0f766e;
+        border-color: #99f6e4;
       }
       .stream-row {
         display: flex;
@@ -458,7 +483,15 @@
       {% elif notice == "restored" %}
       <div class="notice">Playlist restored. It is active again.</div>
       {% elif notice == "synced" %}
-      <div class="notice">Playlist synced successfully{% if new_count %}. {{ new_count }} new stream{% if new_count != 1 %}s{% endif %} highlighted{% endif %}.</div>
+      <div class="notice">
+        Playlist synced successfully.
+        {% if added_count or removed_count or unavailable_count or available_count %}
+        {{ added_count }} added, {{ removed_count }} removed, {{ unavailable_count }} unavailable, {{ available_count }} available again.
+        {% else %}
+        No playlist changes since last sync.
+        {% endif %}
+        {% if new_count %} {{ new_count }} new stream{% if new_count != 1 %}s{% endif %} highlighted.{% endif %}
+      </div>
       {% elif notice == "sync_failed" %}
       <div class="notice info">Playlist saved, but sync failed. Try Sync again.</div>
       {% elif notice == "updated" %}
@@ -528,10 +561,21 @@
                   <div class="streams-shell" data-selection-form data-form-id="playlist-select-{{ item.playlist_id }}">
                     <form id="playlist-select-{{ item.playlist_id }}" method="post" action="/playlists/{{ item.playlist_id }}/queue-selected"></form>
                     <div class="batch-bar">
-                      <div class="batch-shortcuts">
-                        <button type="button" data-select-filter="new">Select new</button>
-                        <button type="button" data-select-filter="undownloaded">Select undownloaded</button>
-                        <button type="button" data-select-filter="clear">Clear</button>
+                      <div class="batch-controls">
+                        <div class="batch-shortcuts">
+                          <button type="button" data-select-filter="new">Select new</button>
+                          <button type="button" data-select-filter="undownloaded">Select undownloaded</button>
+                          <button type="button" data-select-filter="clear">Clear</button>
+                        </div>
+                        <div class="filter-bar" data-filter-group>
+                          <span class="muted">Show:</span>
+                          <button class="filter-chip is-active" type="button" data-stream-filter="all">All</button>
+                          <button class="filter-chip" type="button" data-stream-filter="new">New</button>
+                          <button class="filter-chip" type="button" data-stream-filter="undownloaded">Undownloaded</button>
+                          <button class="filter-chip" type="button" data-stream-filter="queued">Queued</button>
+                          <button class="filter-chip" type="button" data-stream-filter="downloaded">Downloaded</button>
+                          <button class="filter-chip" type="button" data-stream-filter="failed">Failed</button>
+                        </div>
                       </div>
                       <div class="batch-actions">
                         <span class="muted" data-selection-count>0 selected</span>
@@ -619,175 +663,6 @@
       <a class="footer-link" href="/terms">Terms &amp; Conditions</a>
       <a class="footer-link" href="/fair-usage">Fair Usage</a>
     </footer>
-    <script>
-      document.addEventListener("click", (e) => {
-        const target = e.target;
-        if (!(target instanceof Element)) return;
-
-        if (target.closest(".actions form button")) {
-          e.stopPropagation();
-        }
-        if (target.closest(".actions a.icon-btn")) {
-          e.stopPropagation();
-        }
-
-        const toggle = target.closest(".fetch-toggle");
-        if (toggle) {
-          e.preventDefault();
-          e.stopPropagation();
-          const menu = toggle.closest(".fetch-menu");
-          if (!menu) return;
-          const wasOpen = menu.classList.contains("open");
-          document.querySelectorAll(".fetch-menu.open").forEach((el) => el.classList.remove("open"));
-          if (!wasOpen) menu.classList.add("open");
-          return;
-        }
-
-        if (!target.closest(".fetch-menu")) {
-          document.querySelectorAll(".fetch-menu.open").forEach((el) => el.classList.remove("open"));
-        }
-      });
-
-      const updateSelectionCount = (form) => {
-        const counter = form.querySelector("[data-selection-count]");
-        const submit = form.querySelector("[data-batch-submit]");
-        if (!counter) return;
-        const selected = form.querySelectorAll("[data-stream-checkbox]:checked").length;
-        counter.textContent = `${selected} selected`;
-        if (submit instanceof HTMLButtonElement) {
-          submit.disabled = selected === 0;
-        }
-      };
-
-      const showToast = (message, isError = false) => {
-        const stack = document.getElementById("toast-stack");
-        if (!stack) return;
-        const toast = document.createElement("div");
-        toast.className = `toast${isError ? " error" : ""}`;
-        toast.textContent = message;
-        stack.appendChild(toast);
-        window.setTimeout(() => {
-          toast.remove();
-        }, 2800);
-      };
-
-      const applyQueuedState = (row, stream) => {
-        if (!(row instanceof HTMLElement)) return;
-        row.dataset.state = "queued";
-        row.dataset.new = "false";
-        row.classList.remove("is-new", "is-fresh", "is-undownloaded");
-        row.classList.add("is-queued");
-
-        const badge = row.querySelector("[data-state-badge]");
-        if (badge instanceof HTMLElement) {
-          badge.textContent = stream.state_label;
-          badge.className = `badge ${stream.badge_tone}`;
-        } else {
-          const meta = row.querySelector(".stream-meta");
-          if (meta instanceof HTMLElement) {
-            const newBadge = document.createElement("span");
-            newBadge.className = `badge ${stream.badge_tone}`;
-            newBadge.dataset.stateBadge = "true";
-            newBadge.textContent = stream.state_label;
-            meta.prepend(newBadge);
-          }
-        }
-
-        let helper = row.querySelector("[data-helper-text]");
-        if (stream.helper_text) {
-          if (!(helper instanceof HTMLElement)) {
-            helper = document.createElement("span");
-            helper.className = "muted";
-            helper.setAttribute("data-helper-text", "");
-            const meta = row.querySelector(".stream-meta");
-            if (meta instanceof HTMLElement) meta.appendChild(helper);
-          }
-          helper.textContent = stream.helper_text;
-        } else if (helper instanceof HTMLElement) {
-          helper.remove();
-        }
-
-        const checkbox = row.querySelector("[data-stream-checkbox]");
-        if (checkbox instanceof HTMLInputElement) {
-          checkbox.checked = false;
-          checkbox.disabled = true;
-        }
-
-        const inlineForm = row.querySelector("[data-inline-queue-form]");
-        if (inlineForm instanceof HTMLElement) {
-          inlineForm.remove();
-        }
-
-        const selectionForm = row.closest("[data-selection-form]");
-        if (selectionForm instanceof HTMLElement) {
-          updateSelectionCount(selectionForm);
-        }
-      };
-
-      document.querySelectorAll("[data-selection-form]").forEach((form) => {
-        updateSelectionCount(form);
-
-        form.addEventListener("change", (event) => {
-          const target = event.target;
-          if (!(target instanceof HTMLInputElement)) return;
-          if (!target.matches("[data-stream-checkbox]")) return;
-          updateSelectionCount(form);
-        });
-
-        form.querySelectorAll("[data-select-filter]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const mode = button.getAttribute("data-select-filter");
-            form.querySelectorAll("[data-stream-row]").forEach((row) => {
-              if (!(row instanceof HTMLElement)) return;
-              const checkbox = row.querySelector("[data-stream-checkbox]");
-              if (!(checkbox instanceof HTMLInputElement) || checkbox.disabled) return;
-
-              if (mode === "clear") {
-                checkbox.checked = false;
-              } else if (mode === "new") {
-                checkbox.checked = row.dataset.new === "true";
-              } else if (mode === "undownloaded") {
-                checkbox.checked = ["undownloaded", "new", "failed"].includes(row.dataset.state || "");
-              }
-            });
-            updateSelectionCount(form);
-          });
-        });
-      });
-
-      document.querySelectorAll("[data-inline-queue-form]").forEach((form) => {
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          const button = form.querySelector("[data-inline-queue-button]");
-          if (button instanceof HTMLButtonElement) {
-            button.disabled = true;
-          }
-
-          try {
-            const response = await fetch(form.action, {
-              method: "POST",
-              body: new FormData(form),
-              headers: {
-                "X-Requested-With": "fetch",
-              },
-            });
-
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-              throw new Error(payload.detail || "Unable to queue stream");
-            }
-
-            const row = form.closest("[data-stream-row]");
-            applyQueuedState(row, payload.stream || {});
-            showToast(payload.message || "Stream queued.");
-          } catch (error) {
-            if (button instanceof HTMLButtonElement) {
-              button.disabled = false;
-            }
-            showToast(error instanceof Error ? error.message : "Unable to queue stream", true);
-          }
-        });
-      });
-    </script>
+    <script src="/static/playlists.js"></script>
   </body>
 </html>

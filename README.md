@@ -49,6 +49,22 @@ docker-compose up --build
 
 Open `http://localhost:8000`.
 
+## Tests
+
+Run tests inside the Docker `api` container so they execute with the project runtime (Python 3.12):
+
+```bash
+docker compose up --build -d
+docker compose exec api sh -lc "python -m unittest discover -s tests -p 'test_*.py'"
+```
+
+If your machine uses legacy Compose:
+
+```bash
+docker-compose up --build -d
+docker-compose exec api sh -lc "python -m unittest discover -s tests -p 'test_*.py'"
+```
+
 ## Current Behavior
 
 - Main intake accepts:
@@ -78,8 +94,11 @@ Open `http://localhost:8000`.
   - icon actions: download, open source, soft-delete
 - Playlist UX (`/playlists` page):
   - add playlist
-  - per-playlist actions: open source, sync, fetch (all / 10 newest), delete
-  - expanding a playlist shows downloaded items + download buttons
+  - per-playlist actions: open source, sync, fetch (`new` / `all` / `10 newest`), delete
+  - expanding a playlist shows the full stream inventory with metadata
+  - per-stream queue action plus multi-select batch queueing
+  - stream filters: `all`, `new`, `undownloaded`, `queued`, `downloaded`, `failed`
+  - sync shows change summary (`added`, `removed`, availability changes)
   - fetch flow deduplicates already queued/running/completed streams
   - temporarily unavailable streams are skipped and retried on later fetch/sync
 
@@ -98,7 +117,9 @@ Open `http://localhost:8000`.
 - `POST /playlists` add/update playlist (form)
 - `POST /playlists/intake` add/update playlist from main-page JSON intake
 - `POST /playlists/{playlist_id}/sync` sync playlist entries
-- `POST /playlists/{playlist_id}/fetch-all` queue missing streams (`mode=all|newest10`)
+- `POST /playlists/{playlist_id}/fetch-all` queue matching streams (`mode=all|new|newest10`)
+- `POST /playlists/{playlist_id}/queue-selected` queue selected playlist streams
+- `POST /api/playlists/{playlist_id}/queue-stream` queue a single playlist stream (async UI path)
 - `POST /playlists/{playlist_id}/delete` soft-delete playlist
 
 ## Performance Tuning
@@ -106,7 +127,7 @@ Open `http://localhost:8000`.
 Current speed-oriented defaults:
 - `NORMALIZATION_MODE=one_pass`
 - `FFMPEG_THREADS=0` (ffmpeg auto threads)
-- `DOWNLOAD_CONCURRENT_FRAGMENTS=4`
+- `DOWNLOAD_CONCURRENT_FRAGMENTS=2`
 - `JOB_TIMEOUT_SECONDS=7200`
 
 For maximum loudness precision (slower), set:

@@ -4,6 +4,7 @@ from pathlib import Path
 import time
 from typing import Optional
 
+from app.core.models import PlaylistRecord
 from app.core.config import settings
 
 
@@ -11,11 +12,13 @@ def _playlist_path(playlist_id: str) -> Path:
     return settings.playlists_dir / f"{playlist_id}.json"
 
 
-def save_playlist(record: dict) -> None:
-    playlist_id = str(record.get("playlist_id") or "").strip()
+def save_playlist(record: dict | PlaylistRecord) -> None:
+    payload = record.to_dict() if isinstance(record, PlaylistRecord) else record
+    playlist_id = str(payload.get("playlist_id") or "").strip()
     if not playlist_id:
         raise ValueError("playlist_id is required")
-    _write_json_atomic(_playlist_path(playlist_id), record)
+    normalized = PlaylistRecord.from_dict(payload).to_dict()
+    _write_json_atomic(_playlist_path(playlist_id), normalized)
 
 
 def load_playlist(playlist_id: str) -> Optional[dict]:
@@ -24,7 +27,7 @@ def load_playlist(playlist_id: str) -> Optional[dict]:
         return None
     for attempt in range(3):
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            return PlaylistRecord.from_dict(json.loads(path.read_text(encoding="utf-8"))).to_dict()
         except json.JSONDecodeError:
             if attempt == 2:
                 return None
@@ -35,7 +38,7 @@ def list_playlists(include_removed: bool = False) -> list[dict]:
     records: list[dict] = []
     for path in settings.playlists_dir.glob("*.json"):
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = PlaylistRecord.from_dict(json.loads(path.read_text(encoding="utf-8"))).to_dict()
             if not include_removed and raw.get("removed") is True:
                 continue
             records.append(raw)

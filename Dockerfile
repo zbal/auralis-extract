@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r /app/requirements.txt
 
 COPY app /app/app
+COPY tests /app/tests
 
 RUN mkdir -p /data/jobs /data/output /tmp/auralis-extract
 
